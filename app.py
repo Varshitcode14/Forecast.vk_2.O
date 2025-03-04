@@ -10,7 +10,7 @@ import pytz
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///forecast_vk.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://forecast_vk_mini_user:8FyGlxDPd3DY48dLZ8XI7Q58ashCkhTi@dpg-cv3kb3nnoe9s739jt790-a.oregon-postgres.render.com/forecast_vk_mini'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
