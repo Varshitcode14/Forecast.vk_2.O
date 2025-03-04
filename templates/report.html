@@ -1,0 +1,1142 @@
+{% extends "base.html" %}
+
+{% block title %}Business Report - KKK Enterprises{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <h2>Business Report</h2>
+  <p>Comprehensive business performance report</p>
+</section>
+
+<!-- Report Date Filter -->
+<div class="card" style="margin-bottom: 2rem;">
+  <div class="card-header">
+    <h3>Report Settings</h3>
+  </div>
+  <div class="card-body" style="padding: 1.5rem;">
+    <form id="report-filter-form" class="report-filter">
+      <div class="filter-group">
+        <label for="report-type">Report Type</label>
+        <select id="report-type" name="report_type">
+          <option value="daily">Daily Report</option>
+          <option value="weekly">Weekly Report</option>
+          <option value="monthly">Monthly Report</option>
+          <option value="custom">Custom Date Range</option>
+        </select>
+      </div>
+      
+      <div class="filter-group" id="single-date-group">
+        <label for="report-date">Date</label>
+        <input type="date" id="report-date" name="report_date">
+      </div>
+      
+      <div class="filter-group date-range-group" style="display: none;">
+        <label for="start-date">Start Date</label>
+        <input type="date" id="start-date" name="start_date">
+      </div>
+      
+      <div class="filter-group date-range-group" style="display: none;">
+        <label for="end-date">End Date</label>
+        <input type="date" id="end-date" name="end_date">
+      </div>
+      
+      <div class="filter-actions">
+        <button type="submit" class="btn">Generate Report</button>
+        <button type="button" id="save-report-btn" class="btn btn-secondary">Save Report</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Inventory Alerts -->
+<div class="card alert-card" id="inventory-alerts" style="margin-bottom: 2rem; border-left: 4px solid #f44336;">
+  <div class="card-header" style="background-color: rgba(244, 67, 54, 0.1);">
+    <h3>⚠️ Inventory Alerts</h3>
+  </div>
+  <div class="card-body" style="padding: 1.5rem;">
+    <div id="inventory-alerts-content">
+      <p class="loading-text">Loading inventory alerts...</p>
+    </div>
+  </div>
+</div>
+
+<!-- Summary Section -->
+<div class="card" style="margin-bottom: 2rem;">
+  <div class="card-header">
+    <h3>Business Summary</h3>
+  </div>
+  <div class="card-body" style="padding: 1.5rem;">
+    <div class="summary-grid">
+      <div class="summary-item">
+        <div class="summary-label">Total Sales</div>
+        <div class="summary-value" id="report-total-sales">₹0</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">Total Purchases</div>
+        <div class="summary-value" id="report-total-purchases">₹0</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">Net Profit</div>
+        <div class="summary-value" id="report-net-profit">₹0</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">Profit Margin</div>
+        <div class="summary-value" id="report-profit-margin">0%</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Sales Performance -->
+<div class="row">
+  <div class="card" style="flex: 1; margin-right: 1rem;">
+    <div class="card-header">
+      <h3>Sales Performance</h3>
+    </div>
+    <div class="card-body" style="padding: 1.5rem;">
+      <div class="chart-container" style="height: 300px;">
+        <canvas id="report-sales-chart"></canvas>
+      </div>
+      <div class="table-container" style="margin-top: 2rem;">
+        <h4>Top Selling Products</h4>
+        <table id="top-products-table" class="report-table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Quantity Sold</th>
+              <th>Revenue</th>
+              <th>Profit</th>
+            </tr>
+          </thead>
+          <tbody id="top-products-body">
+            <tr>
+              <td colspan="4" class="loading-text">Loading product data...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  
+  <div class="card" style="flex: 1;">
+    <div class="card-header">
+      <h3>Customer Performance</h3>
+    </div>
+    <div class="card-body" style="padding: 1.5rem;">
+      <div class="chart-container" style="height: 300px;">
+        <canvas id="report-customers-chart"></canvas>
+      </div>
+      <div class="table-container" style="margin-top: 2rem;">
+        <h4>Top Customers</h4>
+        <table id="top-customers-table" class="report-table">
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Orders</th>
+              <th>Revenue</th>
+            </tr>
+          </thead>
+          <tbody id="top-customers-body">
+            <tr>
+              <td colspan="3" class="loading-text">Loading customer data...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Inventory Status -->
+<div class="card" style="margin-top: 2rem;">
+  <div class="card-header">
+    <h3>Inventory Status</h3>
+  </div>
+  <div class="card-body" style="padding: 1.5rem;">
+    <div class="row">
+      <div style="flex: 1; margin-right: 1rem;">
+        <div class="chart-container" style="height: 300px;">
+          <canvas id="report-inventory-chart"></canvas>
+        </div>
+      </div>
+      <div style="flex: 1;">
+        <div class="inventory-summary">
+          <div class="summary-item">
+            <div class="summary-label">Total Products</div>
+            <div class="summary-value" id="report-total-products">0</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-label">Low Stock Items</div>
+            <div class="summary-value" id="report-low-stock">0</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-label">Out of Stock Items</div>
+            <div class="summary-value" id="report-out-of-stock">0</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-label">Inventory Value</div>
+            <div class="summary-value" id="report-inventory-value">₹0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="table-container" style="margin-top: 2rem;">
+      <h4>Low Stock Items</h4>
+      <table id="low-stock-table" class="report-table">
+        <thead>
+          <tr>
+            <th>Product ID</th>
+            <th>Product Name</th>
+            <th>Current Stock</th>
+            <th>Reorder Level</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="low-stock-body">
+          <tr>
+            <td colspan="5" class="loading-text">Loading inventory data...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Print and Export Options -->
+<div class="action-buttons" style="margin-top: 2rem; display: flex; justify-content: flex-end; gap: 1rem;">
+  <button id="print-report" class="btn btn-secondary">
+    <i class="print-icon"></i> Print Report
+  </button>
+  <button id="export-pdf" class="btn btn-secondary">
+    <i class="pdf-icon"></i> Export as PDF
+  </button>
+  <button id="export-excel" class="btn btn-secondary">
+    <i class="excel-icon"></i> Export as Excel
+  </button>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .report-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    align-items: flex-end;
+  }
+  
+  .filter-group {
+    flex: 1;
+    min-width: 200px;
+  }
+  
+  .filter-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--secondary-color);
+  }
+  
+  .filter-group input,
+  .filter-group select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--secondary-color);
+  }
+  
+  .filter-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+  }
+  
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+  }
+  
+  .summary-item {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+  }
+  
+  .summary-label {
+    color: var(--secondary-color);
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .summary-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: var(--accent-color);
+  }
+  
+  .report-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+  }
+  
+  .report-table th,
+  .report-table td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .report-table th {
+    background-color: rgba(255, 255, 255, 0.05);
+    font-weight: 600;
+    color: var(--secondary-color);
+  }
+  
+  .loading-text {
+    text-align: center;
+    padding: 1rem;
+    color: rgba(255, 255, 255, 0.6);
+  }
+  
+  .alert-item {
+    background-color: rgba(244, 67, 54, 0.1);
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    border-left: 3px solid #f44336;
+  }
+  
+  .alert-title {
+    font-weight: 600;
+    color: #f44336;
+    margin-bottom: 0.5rem;
+  }
+  
+  .alert-message {
+    color: var(--text-color);
+  }
+  
+  .alert-action {
+    margin-top: 0.5rem;
+  }
+  
+  .inventory-summary {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    height: 100%;
+    align-content: center;
+  }
+  
+  @media (max-width: 768px) {
+    .report-filter {
+      flex-direction: column;
+    }
+    
+    .filter-group {
+      width: 100%;
+    }
+    
+    .row {
+      flex-direction: column;
+    }
+    
+    .card {
+      margin-right: 0 !important;
+      margin-bottom: 1rem;
+    }
+    
+    .inventory-summary {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  /* Status colors */
+  .status-critical {
+    color: #f44336;
+    font-weight: bold;
+  }
+  
+  .status-warning {
+    color: #ff9800;
+    font-weight: bold;
+  }
+  
+  .status-good {
+    color: #4caf50;
+  }
+  
+  /* Print styles */
+  @media print {
+    .page-header, .card-header, .filter-actions, .action-buttons {
+      background-color: #f5f5f5 !important;
+      color: #333 !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    
+    body {
+      background-color: white !important;
+      color: black !important;
+    }
+    
+    .card {
+      border: 1px solid #ddd !important;
+      box-shadow: none !important;
+      break-inside: avoid;
+    }
+    
+    .report-filter, .action-buttons {
+      display: none !important;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Include Chart.js library -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Include jsPDF for PDF export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- Include html2canvas for PDF export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set Chart.js defaults
+    Chart.defaults.color = 'rgba(255, 255, 255, 0.8)';
+    Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
+    Chart.defaults.font.family = "'Poppins', sans-serif";
+    
+    // Common chart options
+    const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'top',
+                labels: {
+                    padding: 20,
+                    usePointStyle: true,
+                    pointStyle: 'circle'
+                }
+            },
+            tooltip: {
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                titleFont: {
+                    size: 14,
+                    weight: 'bold'
+                },
+                bodyFont: {
+                    size: 13
+                },
+                padding: 15,
+                cornerRadius: 5,
+                displayColors: true
+            }
+        }
+    };
+    
+    // Set default date to today
+    const today = new Date();
+    document.getElementById('report-date').value = today.toISOString().split('T')[0];
+    
+    // Handle report type change
+    document.getElementById('report-type').addEventListener('change', function() {
+        const reportType = this.value;
+        const singleDateGroup = document.getElementById('single-date-group');
+        const dateRangeGroups = document.querySelectorAll('.date-range-group');
+        
+        if (reportType === 'custom') {
+            singleDateGroup.style.display = 'none';
+            dateRangeGroups.forEach(group => group.style.display = 'block');
+        } else {
+            singleDateGroup.style.display = 'block';
+            dateRangeGroups.forEach(group => group.style.display = 'none');
+        }
+        
+        // Set appropriate default dates
+        if (reportType === 'weekly') {
+            // Set to beginning of current week
+            const startOfWeek = new Date(today);
+            startOfWeek.setDate(today.getDate() - today.getDay());
+            document.getElementById('report-date').value = startOfWeek.toISOString().split('T')[0];
+        } else if (reportType === 'monthly') {
+            // Set to beginning of current month
+            const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            document.getElementById('report-date').value = startOfMonth.toISOString().split('T')[0];
+        } else if (reportType === 'custom') {
+            // Set default range to last 7 days
+            const endDate = new Date(today);
+            const startDate = new Date(today);
+            startDate.setDate(today.getDate() - 7);
+            
+            document.getElementById('start-date').value = startDate.toISOString().split('T')[0];
+            document.getElementById('end-date').value = endDate.toISOString().split('T')[0];
+        } else {
+            // Daily report - set to today
+            document.getElementById('report-date').value = today.toISOString().split('T')[0];
+        }
+    });
+    
+    // Handle report form submission
+    document.getElementById('report-filter-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        generateReport();
+    });
+    
+    // Handle print button
+    document.getElementById('print-report').addEventListener('click', function() {
+        window.print();
+    });
+    
+    // Handle PDF export
+    document.getElementById('export-pdf').addEventListener('click', function() {
+        exportToPDF();
+    });
+    
+    // Handle Excel export
+    document.getElementById('export-excel').addEventListener('click', function() {
+        exportToExcel();
+    });
+    
+    // Handle save report button
+    document.getElementById('save-report-btn').addEventListener('click', function() {
+        saveReport();
+    });
+    
+    // Generate report on page load
+    generateReport();
+    
+    // Clear any sample data from the daily reports list
+    document.getElementById('daily-reports-list').innerHTML = '<p class="loading-text">No reports available</p>';
+    
+    // Function to generate report
+    function generateReport() {
+        const reportType = document.getElementById('report-type').value;
+        let startDate, endDate;
+        
+        if (reportType === 'custom') {
+            startDate = new Date(document.getElementById('start-date').value);
+            endDate = new Date(document.getElementById('end-date').value);
+            // Set end date to end of day
+            endDate.setHours(23, 59, 59, 999);
+        } else {
+            const reportDate = new Date(document.getElementById('report-date').value);
+            
+            if (reportType === 'daily') {
+                startDate = new Date(reportDate);
+                endDate = new Date(reportDate);
+                // Set end date to end of day
+                endDate.setHours(23, 59, 59, 999);
+            } else if (reportType === 'weekly') {
+                startDate = new Date(reportDate);
+                endDate = new Date(reportDate);
+                endDate.setDate(startDate.getDate() + 6);
+                // Set end date to end of day
+                endDate.setHours(23, 59, 59, 999);
+            } else if (reportType === 'monthly') {
+                startDate = new Date(reportDate);
+                endDate = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0);
+                // Set end date to end of day
+                endDate.setHours(23, 59, 59, 999);
+            }
+        }
+        
+        // Fetch data for the report
+        Promise.all([
+            fetch('/api/sales').then(response => response.json()),
+            fetch('/api/purchases').then(response => response.json()),
+            fetch('/api/products').then(response => response.json()),
+            fetch('/api/customers').then(response => response.json())
+        ])
+        .then(([sales, purchases, products, customers]) => {
+            // Filter data by date range
+            const filteredSales = sales.filter(sale => {
+                const saleDate = new Date(sale.sale_date);
+                return saleDate >= startDate && saleDate <= endDate;
+            });
+            
+            const filteredPurchases = purchases.filter(purchase => {
+                const purchaseDate = new Date(purchase.purchase_date);
+                return purchaseDate >= startDate && purchaseDate <= endDate;
+            });
+            
+            // Process data for report
+            const reportData = processReportData(filteredSales, filteredPurchases, products, customers);
+            
+            // Update report UI
+            updateReportUI(reportData, reportType, startDate, endDate);
+        })
+        .catch(error => {
+            console.error('Error fetching data:', error);
+            alert('An error occurred while generating the report');
+        });
+    }
+    
+    // Process data for report
+    function processReportData(sales, purchases, products, customers) {
+        // Calculate total sales, purchases, and profit
+        const totalSales = sales.reduce((sum, sale) => sum + sale.total_amount, 0);
+        const totalPurchases = purchases.reduce((sum, purchase) => sum + purchase.total_amount, 0);
+        const netProfit = totalSales - totalPurchases;
+        const profitMargin = totalSales > 0 ? (netProfit / totalSales) * 100 : 0;
+        
+        // Process sales by day
+        const salesByDay = {};
+        sales.forEach(sale => {
+            const saleDate = new Date(sale.sale_date).toISOString().split('T')[0];
+            if (!salesByDay[saleDate]) {
+                salesByDay[saleDate] = 0;
+            }
+            salesByDay[saleDate] += sale.total_amount;
+        });
+        
+        // Process top selling products
+        const productSales = {};
+        sales.forEach(sale => {
+            sale.items.forEach(item => {
+                if (!productSales[item.product_id]) {
+                    productSales[item.product_id] = {
+                        name: item.product_name,
+                        quantity: 0,
+                        revenue: 0,
+                        cost: 0
+                    };
+                }
+                productSales[item.product_id].quantity += item.quantity;
+                productSales[item.product_id].revenue += item.total_price;
+                
+                // Estimate cost based on unit price
+                const product = products.find(p => p.product_id === item.product_id);
+                if (product) {
+                    productSales[item.product_id].cost += item.quantity * product.cost_per_unit;
+                }
+            });
+        });
+        
+        // Calculate profit for each product
+        Object.values(productSales).forEach(product => {
+            product.profit = product.revenue - product.cost;
+        });
+        
+        const topProducts = Object.entries(productSales)
+            .map(([id, data]) => ({
+                id,
+                ...data
+            }))
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, 5);
+        
+        // Process sales by customer
+        const customerSales = {};
+        sales.forEach(sale => {
+            if (!customerSales[sale.customer_name]) {
+                customerSales[sale.customer_name] = {
+                    totalAmount: 0,
+                    orderCount: 0
+                };
+            }
+            customerSales[sale.customer_name].totalAmount += sale.total_amount;
+            customerSales[sale.customer_name].orderCount += 1;
+        });
+        
+        const topCustomers = Object.entries(customerSales)
+            .map(([name, data]) => ({
+                name,
+                ...data
+            }))
+            .sort((a, b) => b.totalAmount - a.totalAmount)
+            .slice(0, 5);
+        
+        // Process inventory status
+        const inventoryStatus = {
+            totalProducts: products.length,
+            lowStock: 0,
+            outOfStock: 0,
+            totalValue: 0,
+            lowStockItems: []
+        };
+        
+        products.forEach(product => {
+            const value = product.quantity * product.cost_per_unit;
+            inventoryStatus.totalValue += value;
+            
+            // Define low stock threshold (10 or less)
+            const lowStockThreshold = 10;
+            
+            if (product.quantity <= 0) {
+                inventoryStatus.outOfStock++;
+                inventoryStatus.lowStockItems.push({
+                    id: product.product_id,
+                    name: product.name,
+                    quantity: product.quantity,
+                    reorderLevel: lowStockThreshold,
+                    status: 'Out of Stock'
+                });
+            } else if (product.quantity <= lowStockThreshold) {
+                inventoryStatus.lowStock++;
+                inventoryStatus.lowStockItems.push({
+                    id: product.product_id,
+                    name: product.name,
+                    quantity: product.quantity,
+                    reorderLevel: lowStockThreshold,
+                    status: 'Low Stock'
+                });
+            }
+        });
+        
+        // Sort low stock items by quantity (ascending)
+        inventoryStatus.lowStockItems.sort((a, b) => a.quantity - b.quantity);
+        
+        return {
+            totalSales,
+            totalPurchases,
+            netProfit,
+            profitMargin,
+            salesByDay,
+            topProducts,
+            topCustomers,
+            inventoryStatus
+        };
+    }
+    
+    // Update report UI
+    function updateReportUI(data, reportType, startDate, endDate) {
+        // Update summary section
+        document.getElementById('report-total-sales').textContent = `₹${data.totalSales.toLocaleString('en-IN')}`;
+        document.getElementById('report-total-purchases').textContent = `₹${data.totalPurchases.toLocaleString('en-IN')}`;
+        document.getElementById('report-net-profit').textContent = `₹${data.netProfit.toLocaleString('en-IN')}`;
+        document.getElementById('report-profit-margin').textContent = `${data.profitMargin.toFixed(1)}%`;
+        
+        // Update inventory summary
+        document.getElementById('report-total-products').textContent = data.inventoryStatus.totalProducts;
+        document.getElementById('report-low-stock').textContent = data.inventoryStatus.lowStock;
+        document.getElementById('report-out-of-stock').textContent = data.inventoryStatus.outOfStock;
+        document.getElementById('report-inventory-value').textContent = `₹${data.inventoryStatus.totalValue.toLocaleString('en-IN')}`;
+        
+        // Update inventory alerts
+        updateInventoryAlerts(data.inventoryStatus);
+        
+        // Update top products table
+        updateTopProductsTable(data.topProducts);
+        
+        // Update top customers table
+        updateTopCustomersTable(data.topCustomers);
+        
+        // Update low stock table
+        updateLowStockTable(data.inventoryStatus.lowStockItems);
+        
+        // Render charts
+        renderSalesChart(data.salesByDay, reportType, startDate, endDate);
+        renderCustomersChart(data.topCustomers);
+        renderInventoryChart(data.inventoryStatus);
+    }
+    
+    // Update inventory alerts
+    function updateInventoryAlerts(inventoryStatus) {
+        const alertsContainer = document.getElementById('inventory-alerts-content');
+        
+        if (inventoryStatus.outOfStock === 0 && inventoryStatus.lowStock === 0) {
+            alertsContainer.innerHTML = `
+                <div class="alert-item" style="background-color: rgba(76, 175, 80, 0.1); border-left-color: #4caf50;">
+                    <div class="alert-title" style="color: #4caf50;">✓ Inventory Status Good</div>
+                    <div class="alert-message">All products have sufficient stock levels.</div>
+                </div>
+            `;
+            return;
+        }
+        
+        let alertsHTML = '';
+        
+        if (inventoryStatus.outOfStock > 0) {
+            alertsHTML += `
+                <div class="alert-item">
+                    <div class="alert-title">⚠️ Out of Stock Items (${inventoryStatus.outOfStock})</div>
+                    <div class="alert-message">${inventoryStatus.outOfStock} products are currently out of stock and need immediate attention.</div>
+                    <div class="alert-action">
+                        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('low-stock-table').scrollIntoView({behavior: 'smooth'})">View Details</button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (inventoryStatus.lowStock > 0) {
+            alertsHTML += `
+                <div class="alert-item" style="background-color: rgba(255, 152, 0, 0.1); border-left-color: #ff9800;">
+                    <div class="alert-title" style="color: #ff9800;">⚠️ Low Stock Items (${inventoryStatus.lowStock})</div>
+                    <div class="alert-message">${inventoryStatus.lowStock} products are running low and should be restocked soon.</div>
+                    <div class="alert-action">
+                        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('low-stock-table').scrollIntoView({behavior: 'smooth'})">View Details</button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        alertsContainer.innerHTML = alertsHTML;
+    }
+    
+    // Update top products table
+    function updateTopProductsTable(topProducts) {
+        const tableBody = document.getElementById('top-products-body');
+        
+        if (topProducts.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="4" class="loading-text">No sales data available for the selected period</td></tr>`;
+            return;
+        }
+        
+        let rowsHTML = '';
+        
+        topProducts.forEach(product => {
+            rowsHTML += `
+                <tr>
+                    <td>${product.name}</td>
+                    <td>${product.quantity}</td>
+                    <td>₹${product.revenue.toLocaleString('en-IN')}</td>
+                    <td>₹${product.profit.toLocaleString('en-IN')}</td>
+                </tr>
+            `;
+        });
+        
+        tableBody.innerHTML = rowsHTML;
+    }
+    
+    // Update top customers table
+    function updateTopCustomersTable(topCustomers) {
+        const tableBody = document.getElementById('top-customers-body');
+        
+        if (topCustomers.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="3" class="loading-text">No customer data available for the selected period</td></tr>`;
+            return;
+        }
+        
+        let rowsHTML = '';
+        
+        topCustomers.forEach(customer => {
+            rowsHTML += `
+                <tr>
+                    <td>${customer.name}</td>
+                    <td>${customer.orderCount}</td>
+                    <td>₹${customer.totalAmount.toLocaleString('en-IN')}</td>
+                </tr>
+            `;
+        });
+        
+        tableBody.innerHTML = rowsHTML;
+    }
+    
+    // Update low stock table
+    function updateLowStockTable(lowStockItems) {
+        const tableBody = document.getElementById('low-stock-body');
+        
+        if (lowStockItems.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="5" class="loading-text">No low stock items to display</td></tr>`;
+            return;
+        }
+        
+        let rowsHTML = '';
+        
+        lowStockItems.forEach(item => {
+            let statusClass = 'status-good';
+            if (item.status === 'Out of Stock') {
+                statusClass = 'status-critical';
+            } else if (item.status === 'Low Stock') {
+                statusClass = 'status-warning';
+            }
+            
+            rowsHTML += `
+                <tr>
+                    <td>${item.id}</td>
+                    <td>${item.name}</td>
+                    <td>${item.quantity}</td>
+                    <td>${item.reorderLevel}</td>
+                    <td class="${statusClass}">${item.status}</td>
+                </tr>
+            `;
+        });
+        
+        tableBody.innerHTML = rowsHTML;
+    }
+    
+    // Render sales chart
+    function renderSalesChart(salesByDay, reportType, startDate, endDate) {
+        const ctx = document.getElementById('report-sales-chart').getContext('2d');
+        
+        // Prepare date labels and data
+        const dateLabels = [];
+        const salesData = [];
+        
+        // Generate all dates in the range
+        const currentDate = new Date(startDate);
+        while (currentDate <= endDate) {
+            const dateStr = currentDate.toISOString().split('T')[0];
+            dateLabels.push(dateStr);
+            salesData.push(salesByDay[dateStr] || 0);
+            
+            // Move to next day
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+        
+        // Format date labels based on report type
+        const formattedLabels = dateLabels.map(dateStr => {
+            const date = new Date(dateStr);
+            if (reportType === 'monthly') {
+                return date.toLocaleDateString('en-US', { day: 'numeric' });
+            } else {
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }
+        });
+        
+        // Destroy previous chart if it exists
+        if (window.salesChart) {
+            window.salesChart.destroy();
+        }
+        
+        // Create new chart
+        window.salesChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: formattedLabels,
+                datasets: [{
+                    label: 'Sales Amount',
+                    data: salesData,
+                    backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...commonOptions,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '₹' + value.toLocaleString('en-IN');
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Render customers chart
+    function renderCustomersChart(topCustomers) {
+        const ctx = document.getElementById('report-customers-chart').getContext('2d');
+        
+        const customerNames = topCustomers.map(customer => customer.name);
+        const customerAmounts = topCustomers.map(customer => customer.totalAmount);
+        
+        // Destroy previous chart if it exists
+        if (window.customersChart) {
+            window.customersChart.destroy();
+        }
+        
+        // Create new chart
+        window.customersChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: customerNames,
+                datasets: [{
+                    data: customerAmounts,
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(153, 102, 255, 0.7)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...commonOptions,
+                plugins: {
+                    ...commonOptions.plugins,
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ₹${value.toLocaleString('en-IN')} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Render inventory chart
+    function renderInventoryChart(inventoryStatus) {
+        const ctx = document.getElementById('report-inventory-chart').getContext('2d');
+        
+        // Prepare data
+        const labels = ['Good Stock', 'Low Stock', 'Out of Stock'];
+        const data = [
+            inventoryStatus.totalProducts - inventoryStatus.lowStock - inventoryStatus.outOfStock,
+            inventoryStatus.lowStock,
+            inventoryStatus.outOfStock
+        ];
+        
+        // Destroy previous chart if it exists
+        if (window.inventoryChart) {
+            window.inventoryChart.destroy();
+        }
+        
+        // Create new chart
+        window.inventoryChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: [
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(255, 99, 132, 0.7)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...commonOptions,
+                plugins: {
+                    ...commonOptions.plugins,
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ${value} products (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Export to PDF
+    function exportToPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        
+        // Get report title based on report type
+        const reportType = document.getElementById('report-type').value;
+        let reportTitle = 'Daily Report';
+        
+        if (reportType === 'weekly') {
+            reportTitle = 'Weekly Report';
+        } else if (reportType === 'monthly') {
+            reportTitle = 'Monthly Report';
+        } else if (reportType === 'custom') {
+            reportTitle = 'Custom Report';
+        }
+        
+        // Add report title
+        doc.setFontSize(18);
+        doc.text(reportTitle, 105, 15, { align: 'center' });
+        
+        // Add date range
+        let dateRange = '';
+        if (reportType === 'custom') {
+            const startDate = new Date(document.getElementById('start-date').value);
+            const endDate = new Date(document.getElementById('end-date').value);
+            dateRange = `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
+        } else {
+            const reportDate = new Date(document.getElementById('report-date').value);
+            dateRange = reportDate.toLocaleDateString();
+        }
+        
+        doc.setFontSize(12);
+        doc.text(`Date: ${dateRange}`, 105, 25, { align: 'center' });
+        
+        // Use html2canvas to capture charts and tables
+        html2canvas(document.querySelector('.card')).then(canvas => {
+            const imgData = canvas.toDataURL('image/png');
+            doc.addImage(imgData, 'PNG', 10, 30, 190, 100);
+            
+            // Add more content as needed
+            
+            // Save the PDF
+            doc.save(`${reportTitle.replace(' ', '_')}_${dateRange.replace(/\//g, '-')}.pdf`);
+        });
+    }
+    
+    // Export to Excel
+    function exportToExcel() {
+        // This is a simplified version - in a real app, you'd use a library like SheetJS
+        alert('Excel export functionality would be implemented here with a library like SheetJS');
+    }
+    
+    // Save report to database
+    function saveReport() {
+        const reportType = document.getElementById('report-type').value;
+        let startDate, endDate;
+        
+        if (reportType === 'custom') {
+            startDate = document.getElementById('start-date').value;
+            endDate = document.getElementById('end-date').value;
+        } else {
+            startDate = document.getElementById('report-date').value;
+            
+            if (reportType === 'daily') {
+                endDate = startDate;
+            } else if (reportType === 'weekly') {
+                const endDateObj = new Date(startDate);
+                endDateObj.setDate(endDateObj.getDate() + 6);
+                endDate = endDateObj.toISOString().split('T')[0];
+            } else if (reportType === 'monthly') {
+                const startDateObj = new Date(startDate);
+                const endDateObj = new Date(startDateObj.getFullYear(), startDateObj.getMonth() + 1, 0);
+                endDate = endDateObj.toISOString().split('T')[0];
+            }
+        }
+        
+        const reportData = {
+            report_type: reportType,
+            start_date: startDate,
+            end_date: endDate,
+            total_sales: parseFloat(document.getElementById('report-total-sales').textContent.replace(/[₹,]/g, '')),
+            total_purchases: parseFloat(document.getElementById('report-total-purchases').textContent.replace(/[₹,]/g, '')),
+            net_profit: parseFloat(document.getElementById('report-net-profit').textContent.replace(/[₹,]/g, '')),
+            profit_margin: parseFloat(document.getElementById('report-profit-margin').textContent.replace(/%/g, '')),
+            low_stock_count: parseInt(document.getElementById('report-low-stock').textContent),
+            out_of_stock_count: parseInt(document.getElementById('report-out-of-stock').textContent)
+        };
+        
+        fetch('/api/reports', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(reportData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Report saved successfully!');
+            } else {
+                alert('Error saving report: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while saving the report');
+        });
+    }
+});
+</script>
+{% endblock %}
+

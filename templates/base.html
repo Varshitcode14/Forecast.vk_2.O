@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Forecast.vk{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') }}">
+  <style>
+    .flash-message {
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      margin-bottom: 0.5rem;
+    }
+    .flash-message.error {
+      background-color: rgba(220, 53, 69, 0.2);
+      border: 1px solid rgba(220, 53, 69, 0.3);
+    }
+    .flash-message.success {
+      background-color: rgba(40, 167, 69, 0.2);
+      border: 1px solid rgba(40, 167, 69, 0.3);
+    }
+  </style>
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+  <header>
+      <div class="container header-container">
+          <div class="logo">
+              <div class="logo-box">
+                  <span class="logo-text">F.vk</span>
+              </div>
+              <h1>Forecast.vk</h1>
+          </div>
+          <button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+          <nav>
+              <ul>
+                  <li><a href="{{ url_for('home') }}">Home</a></li>
+                  <li><a href="{{ url_for('insights') }}">Insights</a></li>
+                  <li><a href="{{ url_for('forecast_reports') }}">Forecast & Reports</a></li>
+                  <li><a href="{{ url_for('stock') }}">Stock</a></li>
+                  <li><a href="{{ url_for('customers') }}">Customers</a></li>
+                  <li><a href="{{ url_for('vendors') }}">Vendors</a></li>
+                  <li><a href="{{ url_for('sales') }}">Sales</a></li>
+                  <li><a href="{{ url_for('purchases') }}">Purchases</a></li>
+                  <li><a href="{{ url_for('notifications') }}">Notifications</a></li>
+                  <li><a href="{{ url_for('logout') }}">Logout</a></li>
+              </ul>
+          </nav>
+      </div>
+  </header>
+
+  <main>
+      <div class="container">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              <div class="flash-messages" style="margin-top: 1rem;">
+                {% for category, message in messages %}
+                  <div class="flash-message {{ category }}">
+                    {{ message }}
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          {% endwith %}
+          
+          {% block content %}{% endblock %}
+      </div>
+  </main>
+
+  <footer>
+    <div class="container">
+        <p>&copy; 2025 Forecast.vk. All rights reserved.</p>
+        <p>Made by K Varshit demo version for Forecast.vk (version 2.O)</p>
+    </div>
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>
+

@@ -1,0 +1,1174 @@
+{% extends "base.html" %}
+
+{% block title %}Purchases - KKK Enterprises{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <h2>Purchase Management</h2>
+  <p>Track and manage your purchase orders and supplier relationships.</p>
+</section>
+
+<div class="summary-cards">
+  <div class="summary-card">
+      <h4>This Month</h4>
+      <span class="amount" id="month-purchases">₹0</span>
+      <span class="trend">Monthly purchases</span>
+  </div>
+  <div class="summary-card">
+      <h4>Pending Orders</h4>
+      <span class="amount" id="pending-orders">0</span>
+      <span class="trend">Awaiting delivery</span>
+  </div>
+  <div class="summary-card">
+      <h4>Total Vendors</h4>
+      <span class="amount" id="total-vendors">0</span>
+      <span class="trend">Active partnerships</span>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+      <h3>Purchase Orders</h3>
+      <button id="add-purchase-btn" class="btn btn-secondary">Add New Purchase</button>
+  </div>
+  <div class="table-container">
+      <table id="purchases-table">
+          <thead>
+              <tr>
+                  <th>Order ID</th>
+                  <th>Vendor</th>
+                  <th>Date</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+              </tr>
+          </thead>
+          <tbody id="purchases-list">
+              <!-- Purchases will be loaded here dynamically -->
+          </tbody>
+      </table>
+  </div>
+</div>
+
+<!-- Add Vendor Modal -->
+<div id="add-vendor-modal" class="modal">
+  <div class="modal-content">
+      <div class="modal-header">
+          <h3>Add New Vendor</h3>
+          <span class="close">&times;</span>
+      </div>
+      <div class="modal-body">
+          <form id="add-vendor-form">
+              <div class="form-group">
+                  <label for="vendor-gst">GST ID</label>
+                  <input type="text" id="vendor-gst" name="gst_id" required>
+              </div>
+              <div class="form-group">
+                  <label for="vendor-name">Vendor Name</label>
+                  <input type="text" id="vendor-name" name="name" required>
+              </div>
+              <div class="form-group">
+                  <label for="vendor-contact">Contact Person</label>
+                  <input type="text" id="vendor-contact" name="contact_person">
+              </div>
+              <div class="form-group">
+                  <label for="vendor-phone">Phone</label>
+                  <input type="text" id="vendor-phone" name="phone">
+              </div>
+              <div class="form-group">
+                  <label for="vendor-email">Email</label>
+                  <input type="email" id="vendor-email" name="email">
+              </div>
+              <div class="form-group">
+                  <label for="vendor-location">Location</label>
+                  <input type="text" id="vendor-location" name="location" required>
+              </div>
+              <div class="form-group">
+                  <label for="vendor-specifications">Specifications</label>
+                  <textarea id="vendor-specifications" name="specifications" rows="4" placeholder="Enter vendor specifications, products they supply, etc."></textarea>
+              </div>
+              <div class="form-actions">
+                  <button type="button" class="btn btn-secondary" id="cancel-vendor">Cancel</button>
+                  <button type="submit" class="btn">Save Vendor</button>
+              </div>
+          </form>
+      </div>
+  </div>
+</div>
+
+<!-- Edit Vendor Modal -->
+<div id="edit-vendor-modal" class="modal">
+  <div class="modal-content">
+      <div class="modal-header">
+          <h3>Edit Vendor</h3>
+          <span class="close">&times;</span>
+      </div>
+      <div class="modal-body">
+          <form id="edit-vendor-form">
+              <input type="hidden" id="edit-vendor-id" name="id">
+              <div class="form-group">
+                  <label for="edit-vendor-gst">GST ID</label>
+                  <input type="text" id="edit-vendor-gst" name="gst_id" readonly>
+              </div>
+              <div class="form-group">
+                  <label for="edit-vendor-name">Vendor Name</label>
+                  <input type="text" id="edit-vendor-name" name="name" required>
+              </div>
+              <div class="form-group">
+                  <label for="edit-vendor-contact">Contact Person</label>
+                  <input type="text" id="edit-vendor-contact" name="contact_person">
+              </div>
+              <div class="form-group">
+                  <label for="edit-vendor-phone">Phone</label>
+                  <input type="text" id="edit-vendor-phone" name="phone">
+              </div>
+              <div class="form-group">
+                  <label for="edit-vendor-email">Email</label>
+                  <input type="email" id="edit-vendor-email" name="email">
+              </div>
+              <div class="form-group">
+                  <label for="edit-vendor-location">Location</label>
+                  <input type="text" id="edit-vendor-location" name="location" required>
+              </div>
+              <div class="form-group">
+                  <label for="edit-vendor-specifications">Specifications</label>
+                  <textarea id="edit-vendor-specifications" name="specifications" rows="4" placeholder="Enter vendor specifications, products they supply, etc."></textarea>
+              </div>
+              <div class="form-actions">
+                  <button type="button" class="btn btn-secondary" id="cancel-edit-vendor">Cancel</button>
+                  <button type="submit" class="btn">Update Vendor</button>
+              </div>
+          </form>
+      </div>
+  </div>
+</div>
+
+<!-- Delete Vendor Confirmation Modal -->
+<div id="delete-vendor-modal" class="modal">
+  <div class="modal-content">
+      <div class="modal-header">
+          <h3>Confirm Delete</h3>
+          <span class="close">&times;</span>
+      </div>
+      <div class="modal-body">
+          <p>Are you sure you want to delete this vendor? This action cannot be undone.</p>
+          <input type="hidden" id="delete-vendor-id">
+          <div class="form-actions">
+              <button type="button" class="btn btn-secondary" id="cancel-delete-vendor">Cancel</button>
+              <button type="button" class="btn btn-danger" id="confirm-delete-vendor">Delete</button>
+          </div>
+      </div>
+  </div>
+</div>
+
+<!-- Add Purchase Modal -->
+<div id="add-purchase-modal" class="modal">
+  <div class="modal-content" style="max-width: 800px;">
+      <div class="modal-header">
+          <h3>Add New Purchase</h3>
+          <span class="close">&times;</span>
+      </div>
+      <div class="modal-body">
+          <form id="add-purchase-form">
+              <div class="form-section">
+                  <div class="form-section-title">Vendor Information</div>
+                  <div class="form-group">
+                      <label for="purchase-vendor">Vendor</label>
+                      <select id="purchase-vendor" name="vendor_id" required>
+                          <option value="">Select Vendor</option>
+                      </select>
+                  </div>
+                  <div class="form-group">
+                      <label for="purchase-gst-id">GST ID</label>
+                      <input type="text" id="purchase-gst-id" name="gst_id" readonly>
+                  </div>
+              </div>
+
+              <div class="form-section">
+                  <div class="form-section-title">Purchase Details</div>
+                  <div class="form-group">
+                      <label for="purchase-order-id">Order ID</label>
+                      <input type="text" id="purchase-order-id" name="order_id" required>
+                  </div>
+                  <div class="form-group">
+                      <label for="purchase-date">Purchase Date</label>
+                      <input type="date" id="purchase-date" name="purchase_date" required>
+                  </div>
+                  <div class="form-group">
+                      <label for="purchase-status">Status</label>
+                      <select id="purchase-status" name="status" required>
+                          <option value="Ordered">Ordered</option>
+                          <option value="In Transit">In Transit</option>
+                          <option value="Delivered">Delivered</option>
+                          <option value="Cancelled">Cancelled</option>
+                      </select>
+                  </div>
+              </div>
+
+              <div class="form-section">
+                  <div class="form-section-title">Products</div>
+                  <div id="purchase-items">
+                      <!-- Purchase items will be added here -->
+                  </div>
+                  <button type="button" id="add-purchase-item-btn" class="btn btn-secondary">Add Another Product</button>
+              </div>
+
+              <div class="form-section">
+                  <div class="form-section-title">Order Summary</div>
+                  <div class="sale-item-grid-small">
+                      <div class="form-group">
+                          <label for="purchase-delivery-charges">Delivery Charges (₹)</label>
+                          <input type="number" id="purchase-delivery-charges" name="delivery_charges" min="0" value="0" required>
+                      </div>
+                      <div class="form-group">
+                          <label for="purchase-total-amount">Total Amount (₹)</label>
+                          <input type="number" id="purchase-total-amount" name="total_amount" readonly>
+                      </div>
+                  </div>
+              </div>
+
+              <div class="form-actions">
+                  <button type="button" class="btn btn-secondary" id="cancel-purchase">Cancel</button>
+                  <button type="submit" class="btn">Save Purchase</button>
+              </div>
+          </form>
+      </div>
+  </div>
+</div>
+
+<!-- View Purchase Details Modal -->
+<div id="view-purchase-modal" class="modal">
+  <div class="modal-content" style="max-width: 800px;">
+      <div class="modal-header">
+          <h3>Purchase Details</h3>
+          <span class="close">&times;</span>
+      </div>
+      <div class="modal-body" id="purchase-details-content">
+          <!-- Purchase details will be loaded here dynamically -->
+      </div>
+  </div>
+</div>
+
+<!-- Update Purchase Status Modal -->
+<div id="update-status-modal" class="modal">
+  <div class="modal-content">
+      <div class="modal-header">
+          <h3>Update Purchase Status</h3>
+          <span class="close">&times;</span>
+      </div>
+      <div class="modal-body">
+          <form id="update-status-form">
+              <input type="hidden" id="update-purchase-id" name="id">
+              <div class="form-group">
+                  <label for="update-purchase-status">Status</label>
+                  <select id="update-purchase-status" name="status" required>
+                      <option value="Ordered">Ordered</option>
+                      <option value="In Transit">In Transit</option>
+                      <option value="Delivered">Delivered</option>
+                      <option value="Cancelled">Cancelled</option>
+                  </select>
+              </div>
+              <div class="form-actions">
+                  <button type="button" class="btn btn-secondary" id="cancel-update-status">Cancel</button>
+                  <button type="submit" class="btn">Update Status</button>
+              </div>
+          </form>
+      </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Modal Styles */
+  .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0, 0, 0, 0.5);
+  }
+
+  .modal-content {
+      background-color: var(--primary-light);
+      margin: 10% auto;
+      padding: 0;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      width: 90%;
+      max-width: 500px;
+      animation: modalFadeIn 0.3s;
+      max-height: 80vh;
+      overflow-y: auto;
+  }
+
+  @keyframes modalFadeIn {
+      from {opacity: 0; transform: translateY(-20px);}
+      to {opacity: 1; transform: translateY(0);}
+  }
+
+  .modal-header {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      background-color: var(--primary-light);
+      z-index: 10;
+  }
+
+  .modal-header h3 {
+      margin: 0;
+      color: var(--secondary-color);
+  }
+
+  .close {
+      color: var(--secondary-color);
+      font-size: 1.5rem;
+      font-weight: bold;
+      cursor: pointer;
+  }
+
+  .close:hover {
+      color: var(--accent-color);
+  }
+
+  .modal-body {
+      padding: 1.5rem;
+  }
+
+  /* Form Styles */
+  .form-section {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+  }
+
+  .form-section-title {
+      color: var(--secondary-color);
+      font-size: 1.1rem;
+      font-weight: 500;
+      margin-bottom: 1.2rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .form-group {
+      margin-bottom: 1.2rem;
+  }
+
+  .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: var(--secondary-color);
+  }
+
+  .form-group input, .form-group select, .form-group textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      background-color: rgba(255, 255, 255, 0.1);
+      color: var(--secondary-color);
+  }
+
+  .form-group textarea {
+      resize: vertical;
+      min-height: 100px;
+  }
+
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      outline: none;
+      border-color: var(--accent-color);
+      box-shadow: 0 0 0 2px rgba(240, 248, 255, 0.2);
+  }
+
+  .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 1rem;
+      margin-top: 1.5rem;
+  }
+
+  .btn-danger {
+      background-color: #f44336;
+  }
+
+  .btn-danger:hover {
+      background-color: #d32f2f;
+  }
+
+  /* Purchase Item Styles */
+  .purchase-item {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .purchase-item-grid {
+      display: grid;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+  }
+
+  @media (min-width: 768px) {
+      .purchase-item-grid {
+          grid-template-columns: repeat(4, 1fr);
+      }
+      
+      .sale-item-grid-small {
+          grid-template-columns: repeat(3, 1fr);
+      }
+  }
+
+  @media (max-width: 767px) {
+      .purchase-item-grid,
+      .sale-item-grid-small {
+          grid-template-columns: 1fr;
+      }
+      
+      .modal-content {
+          margin: 2% auto;
+          width: 95%;
+          max-height: 96vh;
+      }
+      
+      .form-group {
+          margin-bottom: 1rem;
+      }
+      
+      .purchase-item {
+          padding: 1rem;
+      }
+  }
+
+  .remove-item-container {
+      display: flex;
+      justify-content: flex-end;
+      margin: 1rem 0;
+  }
+
+  .btn-remove {
+      background-color: rgba(244, 67, 54, 0.1);
+      color: #f44336;
+      border: 1px solid rgba(244, 67, 54, 0.2);
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      transition: all 0.2s ease;
+  }
+
+  .btn-remove:hover {
+      background-color: rgba(244, 67, 54, 0.2);
+      border-color: rgba(244, 67, 54, 0.3);
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+      // DOM Elements
+      const purchasesTable = document.getElementById('purchases-table');
+      const purchasesList = document.getElementById('purchases-list');
+      const addPurchaseBtn = document.getElementById('add-purchase-btn');
+      const addVendorModal = document.getElementById('add-vendor-modal');
+      const editVendorModal = document.getElementById('edit-vendor-modal');
+      const deleteVendorModal = document.getElementById('delete-vendor-modal');
+      const addVendorForm = document.getElementById('add-vendor-form');
+      const editVendorForm = document.getElementById('edit-vendor-form');
+      const addPurchaseModal = document.getElementById('add-purchase-modal');
+      const viewPurchaseModal = document.getElementById('view-purchase-modal');
+      const updateStatusModal = document.getElementById('update-status-modal');
+      const addPurchaseForm = document.getElementById('add-purchase-form');
+      const updateStatusForm = document.getElementById('update-status-form');
+      const purchaseVendorSelect = document.getElementById('purchase-vendor');
+      const purchaseGstId = document.getElementById('purchase-gst-id');
+      const addPurchaseItemBtn = document.getElementById('add-purchase-item-btn');
+      const purchaseItems = document.getElementById('purchase-items');
+      const purchaseDeliveryCharges = document.getElementById('purchase-delivery-charges');
+      const purchaseTotalAmount = document.getElementById('purchase-total-amount');
+      const monthPurchases = document.getElementById('month-purchases');
+      const pendingOrders = document.getElementById('pending-orders');
+      const totalVendors = document.getElementById('total-vendors');
+
+      // Global variables
+      let vendors = [];
+      let products = [];
+      let itemCount = 0;
+
+      // Close buttons
+      const closeButtons = document.querySelectorAll('.close');
+      closeButtons.forEach(button => {
+          button.addEventListener('click', function() {
+              addVendorModal.style.display = 'none';
+              editVendorModal.style.display = 'none';
+              deleteVendorModal.style.display = 'none';
+              addPurchaseModal.style.display = 'none';
+              viewPurchaseModal.style.display = 'none';
+              updateStatusModal.style.display = 'none';
+          });
+      });
+
+      // Cancel buttons
+      document.getElementById('cancel-vendor').addEventListener('click', function() {
+          addVendorModal.style.display = 'none';
+      });
+
+      document.getElementById('cancel-edit-vendor').addEventListener('click', function() {
+          editVendorModal.style.display = 'none';
+      });
+
+      document.getElementById('cancel-delete-vendor').addEventListener('click', function() {
+          deleteVendorModal.style.display = 'none';
+      });
+
+      document.getElementById('cancel-purchase').addEventListener('click', function() {
+          addPurchaseModal.style.display = 'none';
+      });
+
+      document.getElementById('cancel-update-status').addEventListener('click', function() {
+          updateStatusModal.style.display = 'none';
+      });
+
+      // Show Add Purchase Modal
+      addPurchaseBtn.addEventListener('click', function() {
+          resetPurchaseForm();
+          loadVendors();
+          loadProducts();
+          // Set default date to today
+          const today = new Date().toISOString().split('T')[0];
+          document.getElementById('purchase-date').value = today;
+          addPurchaseModal.style.display = 'block';
+      });
+
+      // Add Vendor Form Submit
+      addVendorForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          
+          const vendorData = {
+              gst_id: document.getElementById('vendor-gst').value,
+              name: document.getElementById('vendor-name').value,
+              contact_person: document.getElementById('vendor-contact').value,
+              phone: document.getElementById('vendor-phone').value,
+              email: document.getElementById('vendor-email').value,
+              location: document.getElementById('vendor-location').value,
+              specifications: document.getElementById('vendor-specifications').value
+          };
+          
+          fetch('/api/vendors', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(vendorData)
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  addVendorModal.style.display = 'none';
+                  loadVendors();
+              } else {
+                  alert(data.message || 'Error adding vendor');
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert('An error occurred while adding the vendor');
+          });
+      });
+
+      // Edit Vendor Form Submit
+      editVendorForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          
+          const vendorId = document.getElementById('edit-vendor-id').value;
+          const vendorData = {
+              name: document.getElementById('edit-vendor-name').value,
+              contact_person: document.getElementById('edit-vendor-contact').value,
+              phone: document.getElementById('edit-vendor-phone').value,
+              email: document.getElementById('edit-vendor-email').value,
+              location: document.getElementById('edit-vendor-location').value,
+              specifications: document.getElementById('edit-vendor-specifications').value
+          };
+          
+          fetch(`/api/vendors/${vendorId}`, {
+              method: 'PUT',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(vendorData)
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  editVendorModal.style.display = 'none';
+                  loadVendors();
+              } else {
+                  alert(data.message || 'Error updating vendor');
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert('An error occurred while updating the vendor');
+          });
+      });
+
+      // Confirm Delete Vendor
+      document.getElementById('confirm-delete-vendor').addEventListener('click', function() {
+          const vendorId = document.getElementById('delete-vendor-id').value;
+          
+          fetch(`/api/vendors/${vendorId}`, {
+              method: 'DELETE'
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  deleteVendorModal.style.display = 'none';
+                  loadVendors();
+              } else {
+                  alert(data.message || 'Error deleting vendor');
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert('An error occurred while deleting the vendor');
+          });
+      });
+
+      // Vendor Select Change
+      purchaseVendorSelect.addEventListener('change', function() {
+          const selectedVendorId = this.value;
+          if (selectedVendorId) {
+              const selectedVendor = vendors.find(v => v.id == selectedVendorId);
+              if (selectedVendor) {
+                  purchaseGstId.value = selectedVendor.gst_id;
+              } else {
+                  purchaseGstId.value = '';
+              }
+          } else {
+              purchaseGstId.value = '';
+          }
+      });
+
+      // Add Purchase Item Button
+      addPurchaseItemBtn.addEventListener('click', function() {
+          addPurchaseItem();
+      });
+
+      // Add Purchase Form Submit
+      addPurchaseForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          
+          const vendorId = purchaseVendorSelect.value;
+          if (!vendorId) {
+              alert('Please select a vendor');
+              return;
+          }
+          
+          const purchaseData = {
+              vendor_id: parseInt(vendorId),
+              order_id: document.getElementById('purchase-order-id').value,
+              purchase_date: document.getElementById('purchase-date').value,
+              status: document.getElementById('purchase-status').value,
+              delivery_charges: parseFloat(purchaseDeliveryCharges.value),
+              total_amount: parseFloat(purchaseTotalAmount.value),
+              items: []
+          };
+          
+          // Get all purchase items
+          const itemElements = document.querySelectorAll('.purchase-item');
+          for (let i = 0; i < itemElements.length; i++) {
+              const item = itemElements[i];
+              const index = item.getAttribute('data-index');
+              
+              const productId = document.getElementById(`purchase-product-${index}`).value;
+              if (!productId) continue;
+              
+              const quantity = parseInt(document.getElementById(`purchase-quantity-${index}`).value);
+              const unitPrice = parseFloat(document.getElementById(`purchase-unit-price-${index}`).value);
+              const gstPercentage = parseFloat(document.getElementById(`purchase-gst-${index}`).value);
+              const totalPrice = parseFloat(document.getElementById(`purchase-total-price-${index}`).value);
+              
+              purchaseData.items.push({
+                  product_id: parseInt(productId),
+                  quantity: quantity,
+                  unit_price: unitPrice,
+                  gst_percentage: gstPercentage,
+                  total_price: totalPrice
+              });
+          }
+          
+          if (purchaseData.items.length === 0) {
+              alert('Please add at least one product');
+              return;
+          }
+          
+          fetch('/api/purchases', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(purchaseData)
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  addPurchaseModal.style.display = 'none';
+                  loadPurchases();
+              } else {
+                  alert(data.message || 'Error adding purchase');
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert('An error occurred while adding the purchase');
+          });
+      });
+
+      // Update Status Form Submit
+      updateStatusForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          
+          const purchaseId = document.getElementById('update-purchase-id').value;
+          const status = document.getElementById('update-purchase-status').value;
+          
+          fetch(`/api/purchases/${purchaseId}`, {
+              method: 'PUT',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ status: status })
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  updateStatusModal.style.display = 'none';
+                  loadPurchases();
+              } else {
+                  alert(data.message || 'Error updating purchase status');
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert('An error occurred while updating the purchase status');
+          });
+      });
+
+      // Load Vendors
+      function loadVendors() {
+          fetch('/api/vendors')
+              .then(response => response.json())
+              .then(data => {
+                  vendors = data;
+            
+            // Update vendor select
+            purchaseVendorSelect.innerHTML = '<option value="">Select Vendor</option>';
+            
+            data.forEach(vendor => {
+                const option = document.createElement('option');
+                option.value = vendor.id;
+                option.textContent = vendor.name;
+                purchaseVendorSelect.appendChild(option);
+            });
+            
+            // Update total vendors count
+            totalVendors.textContent = data.length;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while loading vendors');
+        });
+}
+
+      // Load Products
+      function loadProducts() {
+          fetch('/api/products')
+              .then(response => response.json())
+              .then(data => {
+                  products = data;
+                  
+                  // Update product selects
+                  updateProductSelects();
+              })
+              .catch(error => {
+                  console.error('Error:', error);
+                  alert('An error occurred while loading products');
+              });
+      }
+
+      // Update Product Selects
+      function updateProductSelects() {
+          const productSelects = document.querySelectorAll('.product-select');
+          
+          productSelects.forEach(select => {
+              const currentValue = select.value;
+              select.innerHTML = '<option value="">Select Product</option>';
+              
+              products.forEach(product => {
+                  const option = document.createElement('option');
+                  option.value = product.id;
+                  option.textContent = `${product.product_id} - ${product.name}`;
+                  select.appendChild(option);
+              });
+              
+              // Restore selected value if it exists
+              if (currentValue) {
+                  select.value = currentValue;
+              }
+          });
+      }
+
+      // Add Purchase Item
+      function addPurchaseItem() {
+          const itemTemplate = `
+              <div class="purchase-item" data-index="${itemCount}">
+                  <div class="purchase-item-grid">
+                      <div class="form-group">
+                          <label for="purchase-product-${itemCount}">Product</label>
+                          <select id="purchase-product-${itemCount}" name="product_id" class="product-select" required>
+                              <option value="">Select Product</option>
+                          </select>
+                      </div>
+                      <div class="form-group">
+                          <label for="purchase-product-name-${itemCount}">Product Name</label>
+                          <input type="text" id="purchase-product-name-${itemCount}" name="product_name" readonly>
+                      </div>
+                      <div class="form-group">
+                          <label for="purchase-quantity-${itemCount}">Quantity</label>
+                          <input type="number" id="purchase-quantity-${itemCount}" name="quantity" min="1" value="1" required class="quantity-input">
+                      </div>
+                      <div class="form-group">
+                          <label for="purchase-unit-price-${itemCount}">Unit Price (₹)</label>
+                          <input type="number" id="purchase-unit-price-${itemCount}" name="unit_price" min="0" step="0.01" required class="unit-price-input">
+                      </div>
+                  </div>
+                  
+                  <div class="sale-item-grid-small">
+                      <div class="form-group">
+                          <label for="purchase-gst-${itemCount}">GST (%)</label>
+                          <input type="number" id="purchase-gst-${itemCount}" name="gst_percentage" min="0" max="28" value="18" required class="gst-input">
+                      </div>
+                      <div class="form-group">
+                          <label for="purchase-total-price-${itemCount}">Total Price (₹)</label>
+                          <input type="number" id="purchase-total-price-${itemCount}" name="total_price" readonly>
+                      </div>
+                  </div>
+                  
+                  <div style="display: flex; justify-content: flex-end; margin-bottom: 1.5rem;">
+                      <button type="button" class="btn btn-danger remove-item" style="padding: 0.3rem 0.6rem; font-size: 0.9rem;">Remove</button>
+                  </div>
+                  
+                  <hr style="border: none; border-top: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 1.5rem;">
+              </div>
+          `;
+          
+          purchaseItems.insertAdjacentHTML('beforeend', itemTemplate);
+          
+          // Update product selects
+          updateProductSelects();
+          
+          // Add event listeners
+          setupItemEventListeners(itemCount);
+          
+          itemCount++;
+      }
+
+      // Setup Item Event Listeners
+      function setupItemEventListeners(index) {
+          const productSelect = document.getElementById(`purchase-product-${index}`);
+          const productName = document.getElementById(`purchase-product-name-${index}`);
+          const quantity = document.getElementById(`purchase-quantity-${index}`);
+          const unitPrice = document.getElementById(`purchase-unit-price-${index}`);
+          const gst = document.getElementById(`purchase-gst-${index}`);
+          const totalPrice = document.getElementById(`purchase-total-price-${index}`);
+          
+          // Product select change
+          productSelect.addEventListener('change', function() {
+              const selectedProductId = this.value;
+              if (selectedProductId) {
+                  const selectedProduct = products.find(p => p.id == selectedProductId);
+                  if (selectedProduct) {
+                      productName.value = selectedProduct.name;
+                      unitPrice.value = selectedProduct.cost_per_unit.toFixed(2);
+                      
+                      // Calculate total price
+                      calculateItemTotal(index);
+                  } else {
+                      productName.value = '';
+                      unitPrice.value = '';
+                  }
+              } else {
+                  productName.value = '';
+                  unitPrice.value = '';
+              }
+          });
+          
+          // Quantity, Unit Price, GST change
+          [quantity, unitPrice, gst].forEach(input => {
+              input.addEventListener('input', function() {
+                  calculateItemTotal(index);
+              });
+          });
+          
+          // Remove item button
+          const removeBtn = document.querySelector(`.purchase-item[data-index="${index}"] .remove-item`);
+          removeBtn.addEventListener('click', function() {
+              const item = document.querySelector(`.purchase-item[data-index="${index}"]`);
+              item.remove();
+              calculateOrderTotal();
+          });
+      }
+
+      // Calculate Item Total
+      function calculateItemTotal(index) {
+          const unitPrice = parseFloat(document.getElementById(`purchase-unit-price-${index}`).value) || 0;
+          const quantity = parseInt(document.getElementById(`purchase-quantity-${index}`).value) || 0;
+          const gstPercentage = parseFloat(document.getElementById(`purchase-gst-${index}`).value) || 0;
+          
+          const basePrice = unitPrice * quantity;
+          const gstAmount = (basePrice * gstPercentage) / 100;
+          const totalItemPrice = basePrice + gstAmount;
+          
+          document.getElementById(`purchase-total-price-${index}`).value = totalItemPrice.toFixed(2);
+          
+          calculateOrderTotal();
+      }
+
+      // Calculate Order Total
+      function calculateOrderTotal() {
+          const totalPriceInputs = document.querySelectorAll('[id^="purchase-total-price-"]');
+          let subtotal = 0;
+          
+          totalPriceInputs.forEach(input => {
+              subtotal += parseFloat(input.value) || 0;
+          });
+          
+          const deliveryChargesValue = parseFloat(purchaseDeliveryCharges.value) || 0;
+          const orderTotal = subtotal + deliveryChargesValue;
+          
+          purchaseTotalAmount.value = orderTotal.toFixed(2);
+      }
+
+      // Reset Purchase Form
+      function resetPurchaseForm() {
+          addPurchaseForm.reset();
+          
+          // Clear purchase items
+          purchaseItems.innerHTML = '';
+          
+          // Add first item
+          addPurchaseItem();
+          
+          // Reset totals
+          purchaseTotalAmount.value = '';
+      }
+
+      // Load Purchases
+      function loadPurchases() {
+          fetch('/api/purchases')
+              .then(response => response.json())
+              .then(purchases => {
+                  purchasesList.innerHTML = '';
+                  
+                  let monthTotal = 0;
+                  let pendingCount = 0;
+                  
+                  const today = new Date();
+                  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                  
+                  purchases.forEach(purchase => {
+                      const row = document.createElement('tr');
+                      
+                      const purchaseDate = new Date(purchase.purchase_date);
+                      
+                      // Calculate summary totals
+                      if (purchaseDate >= monthStart) {
+                          monthTotal += purchase.total_amount;
+                      }
+                      
+                      if (purchase.status === 'Ordered' || purchase.status === 'In Transit') {
+                          pendingCount++;
+                      }
+                      
+                      // Determine status class
+                      let statusClass = '';
+                      switch (purchase.status) {
+                          case 'Delivered':
+                              statusClass = 'success';
+                              break;
+                          case 'In Transit':
+                              statusClass = 'warning';
+                              break;
+                          case 'Ordered':
+                              statusClass = 'info';
+                              break;
+                          case 'Cancelled':
+                              statusClass = 'danger';
+                              break;
+                      }
+                      
+                      row.innerHTML = `
+                          <td>${purchase.order_id}</td>
+                          <td>${purchase.vendor_name}</td>
+                          <td>${new Date(purchase.purchase_date).toLocaleDateString()}</td>
+                          <td>₹${purchase.total_amount.toFixed(2)}</td>
+                          <td><span style="color: ${statusClass === 'success' ? '#4caf50' : statusClass === 'warning' ? '#ff9800' : statusClass === 'danger' ? '#f44336' : '#2196f3'}; 
+                              background: ${statusClass === 'success' ? 'rgba(76, 175, 80, 0.1)' : statusClass === 'warning' ? 'rgba(255, 152, 0, 0.1)' : statusClass === 'danger' ? 'rgba(244, 67, 54, 0.1)' : 'rgba(33, 150, 243, 0.1)'};
+                              padding: 0.3rem 0.6rem; border-radius: 4px;">${purchase.status}</span></td>
+                          <td>
+                              <button class="btn btn-secondary view-purchase" data-id="${purchase.id}" data-purchase="${encodeURIComponent(JSON.stringify(purchase))}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem; margin-right: 0.5rem;">View</button>
+                              <button class="btn btn-secondary update-status" data-id="${purchase.id}" data-status="${purchase.status}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem;">Update Status</button>
+                          </td>
+                      `;
+                      
+                      purchasesList.appendChild(row);
+                  });
+                  
+                  // Update summary cards
+                  monthPurchases.textContent = `₹${monthTotal.toFixed(2)}`;
+                  pendingOrders.textContent = pendingCount;
+                  
+                  // Add event listeners to view and update status buttons
+                  document.querySelectorAll('.view-purchase').forEach(button => {
+                      button.addEventListener('click', function() {
+                          const purchaseData = JSON.parse(decodeURIComponent(this.getAttribute('data-purchase')));
+                          showPurchaseDetails(purchaseData);
+                      });
+                  });
+                  
+                  document.querySelectorAll('.update-status').forEach(button => {
+                      button.addEventListener('click', function() {
+                          const purchaseId = this.getAttribute('data-id');
+                          const currentStatus = this.getAttribute('data-status');
+                          
+                          document.getElementById('update-purchase-id').value = purchaseId;
+                          document.getElementById('update-purchase-status').value = currentStatus;
+                          
+                          updateStatusModal.style.display = 'block';
+                      });
+                  });
+              })
+              .catch(error => {
+                  console.error('Error:', error);
+                  alert('An error occurred while loading purchases');
+              });
+      }
+
+      // Show Purchase Details
+      function showPurchaseDetails(purchase) {
+          const purchaseDetailsContent = `
+              <div class="sale-detail-section">
+                  <h4>Vendor Information</h4>
+                  <div class="detail-row">
+                      <span class="detail-label">Vendor Name:</span>
+                      <span class="detail-value">${purchase.vendor_name}</span>
+                  </div>
+                  <div class="detail-row">
+                      <span class="detail-label">GST ID:</span>
+                      <span class="detail-value">${purchase.vendor_gst_id}</span>
+                  </div>
+              </div>
+              
+              <div class="sale-detail-section">
+                  <h4>Purchase Information</h4>
+                  <div class="detail-row">
+                      <span class="detail-label">Order ID:</span>
+                      <span class="detail-value">${purchase.order_id}</span>
+                  </div>
+                  <div class="detail-row">
+                      <span class="detail-label">Purchase Date:</span>
+                      <span class="detail-value">${new Date(purchase.purchase_date).toLocaleDateString()}</span>
+                  </div>
+                  <div class="detail-row">
+                      <span class="detail-label">Status:</span>
+                      <span class="detail-value">${purchase.status}</span>
+                  </div>
+                  <div class="detail-row">
+                      <span class="detail-label">Delivery Charges:</span>
+                      <span class="detail-value">₹${purchase.delivery_charges.toFixed(2)}</span>
+                  </div>
+                  <div class="detail-row">
+                      <span class="detail-label">Total Amount:</span>
+                      <span class="detail-value">₹${purchase.total_amount.toFixed(2)}</span>
+                  </div>
+              </div>
+              
+              <div class="sale-detail-section">
+                  <h4>Products</h4>
+                  <table style="width: 100%;">
+                      <thead>
+                          <tr>
+                              <th>Product ID</th>
+                              <th>Product Name</th>
+                              <th>Quantity</th>
+                              <th>Unit Price</th>
+                              <th>GST %</th>
+                              <th>Total</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          ${purchase.items.map(item => `
+                              <tr>
+                                  <td>${item.product_id}</td>
+                                  <td>${item.product_name}</td>
+                                  <td>${item.quantity}</td>
+                                  <td>₹${item.unit_price.toFixed(2)}</td>
+                                  <td>${item.gst_percentage}%</td>
+                                  <td>₹${item.total_price.toFixed(2)}</td>
+                              </tr>
+                          `).join('')}
+                      </tbody>
+                  </table>
+              </div>
+          `;
+          
+          document.getElementById('purchase-details-content').innerHTML = purchaseDetailsContent;
+          viewPurchaseModal.style.display = 'block';
+      }
+
+      // Add first purchase item
+      addPurchaseItem();
+
+      // Delivery charges change
+      purchaseDeliveryCharges.addEventListener('input', calculateOrderTotal);
+
+      // Initial load
+      loadVendors();
+      loadPurchases();
+
+      // Close modal when clicking outside
+      window.addEventListener('click', function(event) {
+          if (event.target === addVendorModal) {
+              addVendorModal.style.display = 'none';
+          }
+          if (event.target === editVendorModal) {
+              editVendorModal.style.display = 'none';
+          }
+          if (event.target === deleteVendorModal) {
+              deleteVendorModal.style.display = 'none';
+          }
+          if (event.target === addPurchaseModal) {
+              addPurchaseModal.style.display = 'none';
+          }
+          if (event.target === viewPurchaseModal) {
+              viewPurchaseModal.style.display = 'none';
+          }
+          if (event.target === updateStatusModal) {
+              updateStatusModal.style.display = 'none';
+          }
+      });
+  });
+</script>
+{% endblock %}
+

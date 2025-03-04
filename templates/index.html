@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Home - KKK Enterprises{% endblock %}
+
+{% block content %}
+<section class="welcome-section">
+    <h2>Hello {{ current_user.name }}!</h2>
+    <p>Welcome to KKK Enterprises dashboard. Here you can manage your business operations efficiently.</p>
+</section>
+
+<section class="features">
+    <div class="row">
+        <div class="feature-card">
+            <h3>Business Insights</h3>
+            <p>View detailed analytics and reports about your business performance. Track growth, identify trends, and make data-driven decisions.</p>
+            <a href="{{ url_for('insights') }}" class="btn btn-secondary" style="margin-top: 1rem;">View Insights</a>
+        </div>
+        <div class="feature-card">
+            <h3>Inventory Management</h3>
+            <p>Keep track of your stock levels and manage inventory efficiently. Get alerts for low stock and optimize your inventory.</p>
+            <a href="{{ url_for('stock') }}" class="btn btn-secondary" style="margin-top: 1rem;">Manage Stock</a>
+        </div>
+        <div class="feature-card">
+            <h3>Sales Tracking</h3>
+            <p>Monitor your sales performance and identify growth opportunities. Analyze customer behavior and improve your sales strategy.</p>
+            <a href="{{ url_for('sales') }}" class="btn btn-secondary" style="margin-top: 1rem;">View Sales</a>
+        </div>
+    </div>
+</section>
+
+<section class="card">
+    <div class="card-header">
+        <h3>Recent Activity</h3>
+    </div>
+    <div class="recent-activity">
+        <ul style="list-style: none; padding: 0;" id="recent-activity-list">
+            <!-- Recent activity will be loaded dynamically -->
+            <li style="padding: 0.8rem 0;">
+                <p>No recent activity to display</p>
+            </li>
+        </ul>
+    </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // In a real implementation, this would fetch recent activity from an API endpoint
+    // For now, we'll leave it empty
+});
+</script>
+{% endblock %}
+

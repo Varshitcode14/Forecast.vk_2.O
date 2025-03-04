@@ -1,0 +1,1544 @@
+{% extends "base.html" %}
+
+{% block title %}Insights - KKK Enterprises{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <h2>Business Insights</h2>
+  <p>View detailed analytics and reports about your business performance.</p>
+</section>
+
+<!-- Summary Cards -->
+<div class="row">
+  <div class="summary-card">
+      <h4>Revenue</h4>
+      <span class="amount" id="total-revenue">₹0</span>
+      <span class="trend" id="revenue-trend">Loading...</span>
+  </div>
+  <div class="summary-card">
+      <h4>Expenses</h4>
+      <span class="amount" id="total-expenses">₹0</span>
+      <span class="trend" id="expenses-trend">Loading...</span>
+  </div>
+  <div class="summary-card">
+      <h4>Profit</h4>
+      <span class="amount" id="total-profit">₹0</span>
+      <span class="trend" id="profit-trend">Loading...</span>
+  </div>
+  <div class="summary-card">
+      <h4>Profit Margin</h4>
+      <span class="amount" id="profit-margin">0%</span>
+      <span class="trend" id="margin-trend">Loading...</span>
+  </div>
+</div>
+
+<!-- Main Dashboard -->
+<section class="insights-dashboard">
+  <h3>Performance Overview</h3>
+  <div class="chart-container">
+      <canvas id="revenue-chart"></canvas>
+  </div>
+</section>
+
+<!-- Financial Metrics -->
+<section class="insights-section">
+  <h3>Financial Metrics</h3>
+  <div class="row">
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <h3>Key Business Ratios</h3>
+        </div>
+        <div class="metrics-container">
+            <div class="metric-item">
+                <div class="metric-title">Gross Profit Margin</div>
+                <div class="metric-value" id="gross-margin">0%</div>
+                <div class="metric-desc">Revenue minus cost of goods sold, divided by revenue</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-title">Inventory Turnover</div>
+                <div class="metric-value" id="inventory-turnover">0</div>
+                <div class="metric-desc">Cost of goods sold divided by average inventory</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-title">Average Order Value</div>
+                <div class="metric-value" id="avg-order-value">₹0</div>
+                <div class="metric-desc">Total revenue divided by number of orders</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-title">Cash Flow</div>
+                <div class="metric-value" id="cash-flow">₹0</div>
+                <div class="metric-desc">Net cash from operating activities</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <h3>Revenue Breakdown</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="revenue-breakdown-chart"></canvas>
+        </div>
+    </div>
+  </div>
+</section>
+
+<!-- Sales Analytics -->
+<section class="insights-section">
+  <h3>Sales Analytics</h3>
+  <div class="row">
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <h3>Top Selling Products</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="top-products-chart"></canvas>
+        </div>
+    </div>
+    
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <h3>Sales by Customer</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="customer-sales-chart"></canvas>
+        </div>
+    </div>
+  </div>
+</section>
+
+<!-- Sales Patterns -->
+<section class="insights-section">
+  <h3>Sales Patterns</h3>
+  <div class="row">
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <h3>Sales by Day of Week</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="day-of-week-chart"></canvas>
+        </div>
+    </div>
+    
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <h3>Monthly Sales Forecast</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="sales-forecast-chart"></canvas>
+        </div>
+    </div>
+  </div>
+</section>
+
+<!-- Product Performance -->
+<section class="insights-section">
+  <h3>Product Performance</h3>
+  <div class="row">
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <h3>Product Profit Margins</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="product-margins-chart"></canvas>
+        </div>
+    </div>
+    
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <h3>Inventory Turnover Rate</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="inventory-turnover-chart"></canvas>
+        </div>
+    </div>
+  </div>
+</section>
+
+<!-- Customer Insights -->
+<section class="insights-section">
+  <h3>Customer Insights</h3>
+  <div class="row">
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <h3>Customer Retention</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="customer-retention-chart"></canvas>
+        </div>
+    </div>
+    
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <h3>Average Purchase Frequency</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="purchase-frequency-chart"></canvas>
+        </div>
+    </div>
+  </div>
+</section>
+
+<!-- Inventory Analytics -->
+<section class="insights-section">
+  <h3>Inventory Analytics</h3>
+  <div class="row">
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <h3>Stock Levels</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="stock-levels-chart"></canvas>
+        </div>
+    </div>
+    
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <h3>Inventory Value</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="inventory-value-chart"></canvas>
+        </div>
+    </div>
+  </div>
+</section>
+
+<!-- Purchase Analytics -->
+<section class="insights-section">
+  <h3>Purchase Analytics</h3>
+  <div class="row">
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <h3>Spending by Vendor</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="vendor-spending-chart"></canvas>
+        </div>
+    </div>
+    
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <h3>Purchase Trends</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="purchase-trends-chart"></canvas>
+        </div>
+    </div>
+  </div>
+</section>
+
+<!-- Geographic Analysis (placed at the end as requested) -->
+<section class="insights-section">
+  <h3>Geographic Analysis</h3>
+  <div class="row">
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <h3>Sales by Location</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="location-sales-chart"></canvas>
+        </div>
+    </div>
+    
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <h3>Customer Demographics</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="customer-demographics-chart"></canvas>
+        </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+    margin: 20px 0;
+  }
+  
+  .insights-section {
+    margin-bottom: 2rem;
+  }
+  
+  .insights-section h3 {
+    color: var(--secondary-color);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .metrics-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    padding: 1.5rem;
+  }
+  
+  .metric-item {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+    transition: transform 0.3s ease;
+  }
+  
+  .metric-item:hover {
+    transform: translateY(-5px);
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+  
+  .metric-title {
+    color: var(--secondary-color);
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .metric-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: var(--accent-color);
+    margin-bottom: 0.5rem;
+  }
+  
+  .metric-desc {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+  }
+  
+  @media (max-width: 768px) {
+    .chart-container {
+      height: 250px;
+    }
+    
+    .metrics-container {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Include Chart.js library -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set Chart.js defaults for all charts
+    Chart.defaults.color = 'rgba(255, 255, 255, 0.8)';
+    Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
+    Chart.defaults.font.family = "'Poppins', sans-serif";
+    
+    // Common chart options
+    const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'top',
+                labels: {
+                    padding: 20,
+                    usePointStyle: true,
+                    pointStyle: 'circle'
+                }
+            },
+            tooltip: {
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                titleFont: {
+                    size: 14,
+                    weight: 'bold'
+                },
+                bodyFont: {
+                    size: 13
+                },
+                padding: 15,
+                cornerRadius: 5,
+                displayColors: true
+            }
+        }
+    };
+    
+    // Fetch all required data
+    Promise.all([
+        fetch('/api/sales').then(response => response.json()),
+        fetch('/api/purchases').then(response => response.json()),
+        fetch('/api/products').then(response => response.json()),
+        fetch('/api/customers').then(response => response.json()),
+        fetch('/api/vendors').then(response => response.json())
+    ])
+    .then(([sales, purchases, products, customers, vendors]) => {
+        // Process data for insights
+        const insights = processData(sales, purchases, products, customers, vendors);
+        
+        // Update summary cards and metrics
+        updateSummaryCards(insights);
+        updateFinancialMetrics(insights);
+        
+        // Render all charts
+        renderRevenueChart(insights);
+        renderRevenueBreakdownChart(insights);
+        renderTopProductsChart(insights);
+        renderCustomerSalesChart(insights);
+        renderDayOfWeekChart(insights);
+        renderSalesForecastChart(insights);
+        renderProductMarginsChart(insights);
+        renderInventoryTurnoverChart(insights);
+        renderCustomerRetentionChart(insights);
+        renderPurchaseFrequencyChart(insights);
+        renderStockLevelsChart(insights);
+        renderInventoryValueChart(insights);
+        renderVendorSpendingChart(insights);
+        renderPurchaseTrendsChart(insights);
+        renderLocationSalesChart(insights);
+        renderCustomerDemographicsChart(insights);
+    })
+    .catch(error => {
+        console.error('Error fetching data:', error);
+        alert('An error occurred while loading insights data');
+    });
+    
+    // Process data for insights
+    function processData(sales, purchases, products, customers, vendors) {
+        // Calculate total revenue, expenses, and profit
+        const totalRevenue = sales.reduce((sum, sale) => sum + sale.total_amount, 0);
+        const totalExpenses = purchases.reduce((sum, purchase) => sum + purchase.total_amount, 0);
+        const totalProfit = totalRevenue - totalExpenses;
+        const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+        
+        // Get current month and previous month data
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        
+        const currentMonthSales = sales.filter(sale => {
+            const saleDate = new Date(sale.sale_date);
+            return saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear;
+        });
+        
+        const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+        const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+        
+        const previousMonthSales = sales.filter(sale => {
+            const saleDate = new Date(sale.sale_date);
+            return saleDate.getMonth() === previousMonth && saleDate.getFullYear() === previousYear;
+        });
+        
+        const currentMonthRevenue = currentMonthSales.reduce((sum, sale) => sum + sale.total_amount, 0);
+        const previousMonthRevenue = previousMonthSales.reduce((sum, sale) => sum + sale.total_amount, 0);
+        
+        const currentMonthPurchases = purchases.filter(purchase => {
+            const purchaseDate = new Date(purchase.purchase_date);
+            return purchaseDate.getMonth() === currentMonth && purchaseDate.getFullYear() === currentYear;
+        });
+        
+        const previousMonthPurchases = purchases.filter(purchase => {
+            const purchaseDate = new Date(purchase.purchase_date);
+            return purchaseDate.getMonth() === previousMonth && purchaseDate.getFullYear() === previousYear;
+        });
+        
+        const currentMonthExpenses = currentMonthPurchases.reduce((sum, purchase) => sum + purchase.total_amount, 0);
+        const previousMonthExpenses = previousMonthPurchases.reduce((sum, purchase) => sum + purchase.total_amount, 0);
+        
+        // Calculate trends
+        const revenueTrend = previousMonthRevenue === 0 ? 100 : ((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue) * 100;
+        const expensesTrend = previousMonthExpenses === 0 ? 100 : ((currentMonthExpenses - previousMonthExpenses) / previousMonthExpenses) * 100;
+        const profitTrend = previousMonthRevenue - previousMonthExpenses === 0 ? 100 : 
+            (((currentMonthRevenue - currentMonthExpenses) - (previousMonthRevenue - previousMonthExpenses)) / 
+            (previousMonthRevenue - previousMonthExpenses)) * 100;
+            
+        // Calculate current and previous month profit margins
+        const currentMonthProfit = currentMonthRevenue - currentMonthExpenses;
+        const previousMonthProfit = previousMonthRevenue - previousMonthExpenses;
+        const currentMonthMargin = currentMonthRevenue > 0 ? (currentMonthProfit / currentMonthRevenue) * 100 : 0;
+        const previousMonthMargin = previousMonthRevenue > 0 ? (previousMonthProfit / previousMonthRevenue) * 100 : 0;
+        const marginTrend = previousMonthMargin === 0 ? 100 : ((currentMonthMargin - previousMonthMargin) / previousMonthMargin) * 100;
+        
+        // Process sales data by month for the last 12 months
+        const last12Months = [];
+        for (let i = 0; i < 12; i++) {
+            const month = new Date(currentYear, currentMonth - i, 1);
+            last12Months.unshift(month);
+        }
+        
+        const monthlySales = last12Months.map(month => {
+            const monthSales = sales.filter(sale => {
+                const saleDate = new Date(sale.sale_date);
+                return saleDate.getMonth() === month.getMonth() && saleDate.getFullYear() === month.getFullYear();
+            });
+            return {
+                month: month.toLocaleString('default', { month: 'short', year: '2-digit' }),
+                revenue: monthSales.reduce((sum, sale) => sum + sale.total_amount, 0),
+                count: monthSales.length
+            };
+        });
+        
+        const monthlyPurchases = last12Months.map(month => {
+            const monthPurchases = purchases.filter(purchase => {
+                const purchaseDate = new Date(purchase.purchase_date);
+                return purchaseDate.getMonth() === month.getMonth() && purchaseDate.getFullYear() === month.getFullYear();
+            });
+            return {
+                month: month.toLocaleString('default', { month: 'short', year: '2-digit' }),
+                expenses: monthPurchases.reduce((sum, purchase) => sum + purchase.total_amount, 0),
+                count: monthPurchases.length
+            };
+        });
+        
+        // Process top selling products
+        const productSales = {};
+        sales.forEach(sale => {
+            sale.items.forEach(item => {
+                if (!productSales[item.product_id]) {
+                    productSales[item.product_id] = {
+                        name: item.product_name,
+                        quantity: 0,
+                        revenue: 0,
+                        cost: 0
+                    };
+                }
+                productSales[item.product_id].quantity += item.quantity;
+                productSales[item.product_id].revenue += item.total_price;
+                
+                // Estimate cost based on unit price (this is simplified)
+                const product = products.find(p => p.product_id === item.product_id);
+                if (product) {
+                    productSales[item.product_id].cost += item.quantity * product.cost_per_unit;
+                }
+            });
+        });
+        
+        // Calculate profit margins for each product
+        Object.values(productSales).forEach(product => {
+            product.profit = product.revenue - product.cost;
+            product.margin = product.revenue > 0 ? (product.profit / product.revenue) * 100 : 0;
+        });
+        
+        const topProducts = Object.values(productSales)
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, 5);
+            
+        // Calculate inventory turnover
+        const inventoryTurnover = {};
+        products.forEach(product => {
+            const productSale = productSales[product.product_id];
+            if (productSale) {
+                const costOfGoodsSold = productSale.cost;
+                const averageInventory = product.quantity * product.cost_per_unit;
+                inventoryTurnover[product.product_id] = {
+                    name: product.name,
+                    turnover: averageInventory > 0 ? costOfGoodsSold / averageInventory : 0
+                };
+            } else {
+                inventoryTurnover[product.product_id] = {
+                    name: product.name,
+                    turnover: 0
+                };
+            }
+        });
+        
+        const topInventoryTurnover = Object.values(inventoryTurnover)
+            .sort((a, b) => b.turnover - a.turnover)
+            .slice(0, 5);
+        
+        // Process sales by customer
+        const customerSales = {};
+        sales.forEach(sale => {
+            if (!customerSales[sale.customer_name]) {
+                customerSales[sale.customer_name] = {
+                    totalAmount: 0,
+                    orderCount: 0,
+                    firstPurchase: new Date(sale.sale_date),
+                    lastPurchase: new Date(sale.sale_date),
+                    purchases: []
+                };
+            }
+            
+            const saleDate = new Date(sale.sale_date);
+            customerSales[sale.customer_name].totalAmount += sale.total_amount;
+            customerSales[sale.customer_name].orderCount += 1;
+            customerSales[sale.customer_name].purchases.push({
+                date: saleDate,
+                amount: sale.total_amount
+            });
+            
+            if (saleDate < customerSales[sale.customer_name].firstPurchase) {
+                customerSales[sale.customer_name].firstPurchase = saleDate;
+            }
+            
+            if (saleDate > customerSales[sale.customer_name].lastPurchase) {
+                customerSales[sale.customer_name].lastPurchase = saleDate;
+            }
+        });
+        
+        // Calculate customer retention and purchase frequency
+        Object.values(customerSales).forEach(customer => {
+            const daysSinceFirstPurchase = (now - customer.firstPurchase) / (1000 * 60 * 60 * 24);
+            customer.purchaseFrequency = daysSinceFirstPurchase > 0 ? customer.orderCount / (daysSinceFirstPurchase / 30) : 0;
+            
+            // Sort purchases by date
+            customer.purchases.sort((a, b) => a.date - b.date);
+            
+            // Calculate average time between purchases
+            if (customer.purchases.length > 1) {
+                let totalDays = 0;
+                for (let i = 1; i < customer.purchases.length; i++) {
+                    const daysBetween = (customer.purchases[i].date - customer.purchases[i-1].date) / (1000 * 60 * 60 * 24);
+                    totalDays += daysBetween;
+                }
+                customer.avgDaysBetweenPurchases = totalDays / (customer.purchases.length - 1);
+            } else {
+                customer.avgDaysBetweenPurchases = 0;
+            }
+        });
+        
+        const topCustomers = Object.entries(customerSales)
+            .sort((a, b) => b[1].totalAmount - a[1].totalAmount)
+            .slice(0, 5)
+            .map(([name, data]) => ({ 
+                name, 
+                amount: data.totalAmount,
+                orderCount: data.orderCount,
+                purchaseFrequency: data.purchaseFrequency
+            }));
+            
+        // Calculate sales by day of week
+        const dayOfWeekSales = [0, 0, 0, 0, 0, 0, 0]; // Sun, Mon, ..., Sat
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        
+        sales.forEach(sale => {
+            const saleDate = new Date(sale.sale_date);
+            const dayOfWeek = saleDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+            dayOfWeekSales[dayOfWeek] += sale.total_amount;
+        });
+        
+        // Process stock levels
+        const stockLevels = products.map(product => ({
+            name: product.name,
+            quantity: product.quantity,
+            value: product.quantity * product.cost_per_unit
+        }));
+        
+        // Process spending by vendor
+        const vendorSpending = {};
+        purchases.forEach(purchase => {
+            if (!vendorSpending[purchase.vendor_name]) {
+                vendorSpending[purchase.vendor_name] = 0;
+            }
+            vendorSpending[purchase.vendor_name] += purchase.total_amount;
+        });
+        
+        const topVendors = Object.entries(vendorSpending)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([name, amount]) => ({ name, amount }));
+        
+        // Process sales by location
+        const locationSales = {};
+        customers.forEach(customer => {
+            const customerTotalSales = sales
+                .filter(sale => sale.customer_name === customer.name)
+                .reduce((sum, sale) => sum + sale.total_amount, 0);
+            
+            if (!locationSales[customer.location]) {
+                locationSales[customer.location] = 0;
+            }
+            locationSales[customer.location] += customerTotalSales;
+        });
+        
+        const salesByLocation = Object.entries(locationSales)
+            .sort((a, b) => b[1] - a[1])
+            .map(([location, amount]) => ({ location, amount }));
+            
+        // Calculate revenue breakdown (product categories)
+        // For this example, we'll use the first word of the product name as a simple category
+        const revenueByCategory = {};
+        Object.values(productSales).forEach(product => {
+            const category = product.name.split(' ')[0];
+            if (!revenueByCategory[category]) {
+                revenueByCategory[category] = 0;
+            }
+            revenueByCategory[category] += product.revenue;
+        });
+        
+        const categoryRevenue = Object.entries(revenueByCategory)
+            .sort((a, b) => b[1] - a[1])
+            .map(([category, amount]) => ({ category, amount }));
+            
+        // Calculate simple sales forecast for next 3 months
+        const salesForecast = [];
+        
+        // Use last 3 months average growth rate for a simple forecast
+        const last3MonthsData = monthlySales.slice(-3);
+        let avgGrowthRate = 0;
+        
+        if (last3MonthsData.length >= 2) {
+            let totalGrowthRate = 0;
+            for (let i = 1; i < last3MonthsData.length; i++) {
+                const prevRevenue = last3MonthsData[i-1].revenue;
+                const currRevenue = last3MonthsData[i].revenue;
+                if (prevRevenue > 0) {
+                    totalGrowthRate += (currRevenue - prevRevenue) / prevRevenue;
+                }
+            }
+            avgGrowthRate = totalGrowthRate / (last3MonthsData.length - 1);
+        }
+        
+        // If no growth rate available, use 5% as default
+        if (isNaN(avgGrowthRate) || !isFinite(avgGrowthRate)) {
+            avgGrowthRate = 0.05;
+        }
+        
+        // Cap growth rate between -20% and 30%
+        avgGrowthRate = Math.max(-0.2, Math.min(0.3, avgGrowthRate));
+        
+        // Generate forecast for next 3 months
+        const lastMonthRevenue = monthlySales.length > 0 ? monthlySales[monthlySales.length - 1].revenue : 0;
+        
+        for (let i = 1; i <= 3; i++) {
+            const forecastMonth = new Date(currentYear, currentMonth + i, 1);
+            const monthName = forecastMonth.toLocaleString('default', { month: 'short', year: '2-digit' });
+            const forecastRevenue = lastMonthRevenue * Math.pow(1 + avgGrowthRate, i);
+            
+            salesForecast.push({
+                month: monthName,
+                revenue: forecastRevenue
+            });
+        }
+        
+        // Calculate financial metrics
+        const grossMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+        
+        // Calculate average inventory value
+        const totalInventoryValue = products.reduce((sum, product) => sum + (product.quantity * product.cost_per_unit), 0);
+        const avgInventoryValue = totalInventoryValue / products.length;
+        
+        // Calculate overall inventory turnover
+        const totalCostOfGoodsSold = Object.values(productSales).reduce((sum, product) => sum + product.cost, 0);
+        const overallInventoryTurnover = avgInventoryValue > 0 ? totalCostOfGoodsSold / avgInventoryValue : 0;
+        
+        // Calculate average order value
+        const avgOrderValue = sales.length > 0 ? totalRevenue / sales.length : 0;
+        
+        // Simplified cash flow (revenue - expenses)
+        const cashFlow = totalRevenue - totalExpenses;
+        
+        return {
+            totalRevenue,
+            totalExpenses,
+            totalProfit,
+            profitMargin,
+            revenueTrend,
+            expensesTrend,
+            profitTrend,
+            marginTrend,
+            monthlySales,
+            monthlyPurchases,
+            topProducts,
+            topCustomers,
+            stockLevels,
+            topVendors,
+            salesByLocation,
+            customers,
+            products,
+            dayOfWeekSales,
+            dayNames,
+            categoryRevenue,
+            salesForecast,
+            grossMargin,
+            overallInventoryTurnover,
+            avgOrderValue,
+            cashFlow,
+            topInventoryTurnover,
+            customerSales
+        };
+    }
+    
+    // Update summary cards
+    function updateSummaryCards(insights) {
+        document.getElementById('total-revenue').textContent = `₹${insights.totalRevenue.toLocaleString('en-IN')}`;
+        document.getElementById('total-expenses').textContent = `₹${insights.totalExpenses.toLocaleString('en-IN')}`;
+        document.getElementById('total-profit').textContent = `₹${insights.totalProfit.toLocaleString('en-IN')}`;
+        document.getElementById('profit-margin').textContent = `${insights.profitMargin.toFixed(1)}%`;
+        
+        const revenueTrendEl = document.getElementById('revenue-trend');
+        revenueTrendEl.textContent = `${insights.revenueTrend >= 0 ? '↑' : '↓'} ${Math.abs(insights.revenueTrend).toFixed(1)}% from last month`;
+        revenueTrendEl.className = `trend ${insights.revenueTrend >= 0 ? '' : 'down'}`;
+        
+        const expensesTrendEl = document.getElementById('expenses-trend');
+        expensesTrendEl.textContent = `${insights.expensesTrend >= 0 ? '↑' : '↓'} ${Math.abs(insights.expensesTrend).toFixed(1)}% from last month`;
+        expensesTrendEl.className = `trend ${insights.expensesTrend <= 0 ? '' : 'down'}`;
+        
+        const profitTrendEl = document.getElementById('profit-trend');
+        profitTrendEl.textContent = `${insights.profitTrend >= 0 ? '↑' : '↓'} ${Math.abs(insights.profitTrend).toFixed(1)}% from last month`;
+        profitTrendEl.className = `trend ${insights.profitTrend >= 0 ? '' : 'down'}`;
+        
+        const marginTrendEl = document.getElementById('margin-trend');
+        marginTrendEl.textContent = `${insights.marginTrend >= 0 ? '↑' : '↓'} ${Math.abs(insights.marginTrend).toFixed(1)}% from last month`;
+        marginTrendEl.className = `trend ${insights.marginTrend >= 0 ? '' : 'down'}`;
+    }
+    
+    // Update financial metrics
+    function updateFinancialMetrics(insights) {
+        document.getElementById('gross-margin').textContent = `${insights.grossMargin.toFixed(1)}%`;
+        document.getElementById('inventory-turnover').textContent = insights.overallInventoryTurnover.toFixed(2);
+        document.getElementById('avg-order-value').textContent = `₹${insights.avgOrderValue.toLocaleString('en-IN')}`;
+        document.getElementById('cash-flow').textContent = `₹${insights.cashFlow.toLocaleString('en-IN')}`;
+    }
+    
+    // Render Revenue Chart
+    function renderRevenueChart(insights) {
+        const ctx = document.getElementById('revenue-chart').getContext('2d');
+        
+        const months = insights.monthlySales.map(data => data.month);
+        const revenues = insights.monthlySales.map(data => data.revenue);
+        const expenses = insights.monthlyPurchases.map(data => data.expenses);
+        const profits = revenues.map((revenue, i) => revenue - expenses[i]);
+        
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: months,
+                datasets: [
+                    {
+                        label: 'Revenue',
+                        data: revenues,
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: 'Expenses',
+                        data: expenses,
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: 'Profit',
+                        data: profits,
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        tension: 0.4,
+                        fill: true
+                    }
+                ]
+            },
+            options: {
+                ...commonOptions,
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '₹' + value.toLocaleString('en-IN');
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    ...commonOptions.plugins,
+                    title: {
+                        display: true,
+                        text: 'Monthly Revenue, Expenses & Profit',
+                        font: {
+                            size: 16
+                        },
+                        padding: {
+                            top: 10,
+                            bottom: 30
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Render Revenue Breakdown Chart
+    function renderRevenueBreakdownChart(insights) {
+        const ctx = document.getElementById('revenue-breakdown-chart').getContext('2d');
+        
+        const categories = insights.categoryRevenue.map(item => item.category);
+        const amounts = insights.categoryRevenue.map(item => item.amount);
+        
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: categories,
+                datasets: [{
+                    data: amounts,
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(153, 102, 255, 0.7)',
+                        'rgba(255, 159, 64, 0.7)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...commonOptions,
+                plugins: {
+                    ...commonOptions.plugins,
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ₹${value.toLocaleString('en-IN')} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Render Top Products Chart
+    function renderTopProductsChart(insights) {
+        const ctx = document.getElementById('top-products-chart').getContext('2d');
+        
+        const productNames = insights.topProducts.map(product => product.name);
+        const productRevenues = insights.topProducts.map(product => product.revenue);
+        
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: productNames,
+                datasets: [{
+                    label: 'Revenue',
+                    data: productRevenues,
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(153, 102, 255, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(153, 102, 255, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...commonOptions,
+                indexAxis: 'y',
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '₹' + value.toLocaleString('en-IN');
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Render Customer Sales Chart
+    function renderCustomerSalesChart(insights) {
+        const ctx = document.getElementById('customer-sales-chart').getContext('2d');
+        
+        const customerNames = insights.topCustomers.map(customer => customer.name);
+        const customerAmounts = insights.topCustomers.map(customer => customer.amount);
+        
+        new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: customerNames,
+                datasets: [{
+                    data: customerAmounts,
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(153, 102, 255, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(153, 102, 255, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...commonOptions,
+                plugins: {
+                    ...commonOptions.plugins,
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ₹${value.toLocaleString('en-IN')} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Render Day of Week Chart
+    function renderDayOfWeekChart(insights) {
+        const ctx = document.getElementById('day-of-week-chart').getContext('2d');
+        
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: insights.dayNames,
+                datasets: [{
+                    label: 'Sales Amount',
+                    data: insights.dayOfWeekSales,
+                    backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...commonOptions,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '₹' + value.toLocaleString('en-IN');
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Render Sales Forecast Chart
+    function renderSalesForecastChart(insights) {
+        const ctx = document.getElementById('sales-forecast-chart').getContext('2d');
+        
+        // Get last 3 months of actual data
+        const actualMonths = insights.monthlySales.slice(-3).map(data => data.month);
+        const actualRevenues = insights.monthlySales.slice(-3).map(data => data.revenue);
+        
+        // Get forecast data
+        const forecastMonths = insights.salesForecast.map(data => data.month);
+        const forecastRevenues = insights.salesForecast.map(data => data.revenue);
+        
+        // Combine for display
+        const allMonths = [...actualMonths, ...forecastMonths];
+        
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: allMonths,
+                datasets: [
+                    {
+                        label: 'Actual Revenue',
+                        data: [...actualRevenues, ...Array(forecastMonths.length).fill(null)],
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: 'Forecast Revenue',
+                        data: [...Array(actualMonths.length).fill(null), ...forecastRevenues],
+                        borderColor: 'rgba(255, 159, 64, 1)',
+                        backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                        borderDash: [5, 5],
+                        tension: 0.4,
+                        fill: true
+                    }
+                ]
+            },
+            options: {
+                ...commonOptions,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '₹' + value.toLocaleString('en-IN');
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Render Product Margins Chart
+    function renderProductMarginsChart(insights) {
+        const ctx = document.getElementById('product-margins-chart').getContext('2d');
+        
+        const productNames = insights.topProducts.map(product => product.name);
+        const productMargins = insights.topProducts.map(product => product.margin);
+        
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: productNames,
+                datasets: [{
+                    label: 'Profit Margin (%)',
+                    data: productMargins,
+                    backgroundColor: 'rgba(153, 102, 255, 0.7)',
+                    borderColor: 'rgba(153, 102, 255, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...commonOptions,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Render Inventory Turnover Chart
+    function renderInventoryTurnoverChart(insights) {
+        const ctx = document.getElementById('inventory-turnover-chart').getContext('2d');
+        
+        const productNames = insights.topInventoryTurnover.map(product => product.name);
+        const turnoverRates = insights.topInventoryTurnover.map(product => product.turnover);
+        
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: productNames,
+                datasets: [{
+                    label: 'Inventory Turnover Rate',
+                    data: turnoverRates,
+                    backgroundColor: 'rgba(255, 206, 86, 0.7)',
+                    borderColor: 'rgba(255, 206, 86, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...commonOptions,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+    
+    // Render Customer Retention Chart
+    function renderCustomerRetentionChart(insights) {
+        const ctx = document.getElementById('customer-retention-chart').getContext('2d');
+        
+        // Group customers by recency (days since last purchase)
+        const recencyGroups = {
+            'Last 30 days': 0,
+            '30-60 days': 0,
+            '60-90 days': 0,
+            '90+ days': 0
+        };
+        
+        const now = new Date();
+        
+        Object.values(insights.customerSales).forEach(customer => {
+            const daysSinceLastPurchase = (now - customer.lastPurchase) / (1000 * 60 * 60 * 24);
+            
+            if (daysSinceLastPurchase <= 30) {
+                recencyGroups['Last 30 days']++;
+            } else if (daysSinceLastPurchase <= 60) {
+                recencyGroups['30-60 days']++;
+            } else if (daysSinceLastPurchase <= 90) {
+                recencyGroups['60-90 days']++;
+            } else {
+                recencyGroups['90+ days']++;
+            }
+        });
+        
+        const recencyLabels = Object.keys(recencyGroups);
+        const recencyCounts = Object.values(recencyGroups);
+        
+        new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: recencyLabels,
+                datasets: [{
+                    data: recencyCounts,
+                    backgroundColor: [
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(255, 159, 64, 0.7)',
+                        'rgba(255, 99, 132, 0.7)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...commonOptions,
+                plugins: {
+                    ...commonOptions.plugins,
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ${value} customers (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Render Purchase Frequency Chart
+    function renderPurchaseFrequencyChart(insights) {
+        const ctx = document.getElementById('purchase-frequency-chart').getContext('2d');
+        
+        const customerNames = insights.topCustomers.map(customer => customer.name);
+        const purchaseFrequencies = insights.topCustomers.map(customer => customer.purchaseFrequency);
+        
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: customerNames,
+                datasets: [{
+                    label: 'Purchases per Month',
+                    data: purchaseFrequencies,
+                    backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...commonOptions,
+                indexAxis: 'y',
+                scales: {
+                    x: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+    
+    // Render Stock Levels Chart
+    function renderStockLevelsChart(insights) {
+        const ctx = document.getElementById('stock-levels-chart').getContext('2d');
+        
+        // Get top 10 products by quantity
+        const topStockProducts = [...insights.stockLevels]
+            .sort((a, b) => b.quantity - a.quantity)
+            .slice(0, 10);
+        
+        const productNames = topStockProducts.map(product => product.name);
+        const productQuantities = topStockProducts.map(product => product.quantity);
+        
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: productNames,
+                datasets: [{
+                    label: 'Quantity',
+                    data: productQuantities,
+                    backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...commonOptions,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+    
+    // Render Inventory Value Chart
+    function renderInventoryValueChart(insights) {
+        const ctx = document.getElementById('inventory-value-chart').getContext('2d');
+        
+        // Get top 10 products by value
+        const topValueProducts = [...insights.stockLevels]
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 10);
+        
+        const productNames = topValueProducts.map(product => product.name);
+        const productValues = topValueProducts.map(product => product.value);
+        
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: productNames,
+                datasets: [{
+                    data: productValues,
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(153, 102, 255, 0.7)',
+                        'rgba(255, 159, 64, 0.7)',
+                        'rgba(199, 199, 199, 0.7)',
+                        'rgba(83, 102, 255, 0.7)',
+                        'rgba(78, 205, 196, 0.7)',
+                        'rgba(255, 99, 255, 0.7)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...commonOptions,
+                plugins: {
+                    ...commonOptions.plugins,
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ₹${value.toLocaleString('en-IN')} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Render Vendor Spending Chart
+    function renderVendorSpendingChart(insights) {
+        const ctx = document.getElementById('vendor-spending-chart').getContext('2d');
+        
+        const vendorNames = insights.topVendors.map(vendor => vendor.name);
+        const vendorAmounts = insights.topVendors.map(vendor => vendor.amount);
+        
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: vendorNames,
+                datasets: [{
+                    label: 'Amount Spent',
+                    data: vendorAmounts,
+                    backgroundColor: 'rgba(255, 159, 64, 0.7)',
+                    borderColor: 'rgba(255, 159, 64, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...commonOptions,
+                indexAxis: 'y',
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '₹' + value.toLocaleString('en-IN');
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Render Purchase Trends Chart
+    function renderPurchaseTrendsChart(insights) {
+        const ctx = document.getElementById('purchase-trends-chart').getContext('2d');
+        
+        const months = insights.monthlyPurchases.map(data => data.month);
+        const amounts = insights.monthlyPurchases.map(data => data.expenses);
+        const counts = insights.monthlyPurchases.map(data => data.count);
+        
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: months,
+                datasets: [
+                    {
+                        label: 'Purchase Amount',
+                        data: amounts,
+                        borderColor: 'rgba(255, 159, 64, 1)',
+                        backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                        tension: 0.4,
+                        fill: true,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Purchase Count',
+                        data: counts,
+                        borderColor: 'rgba(153, 102, 255, 1)',
+                        backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                        tension: 0.4,
+                        fill: true,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                ...commonOptions,
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        position: 'left',
+                        ticks: {
+                            callback: function(value) {
+                                return '₹' + value.toLocaleString('en-IN');
+                            }
+                        }
+                    },
+                    y1: {
+                        beginAtZero: true,
+                        position: 'right',
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Render Location Sales Chart
+    function renderLocationSalesChart(insights) {
+        const ctx = document.getElementById('location-sales-chart').getContext('2d');
+        
+        const locations = insights.salesByLocation.map(item => item.location);
+        const amounts = insights.salesByLocation.map(item => item.amount);
+        
+        new Chart(ctx, {
+            type: 'polarArea',
+            data: {
+                labels: locations,
+                datasets: [{
+                    data: amounts,
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(153, 102, 255, 0.7)',
+                        'rgba(255, 159, 64, 0.7)',
+                        'rgba(199, 199, 199, 0.7)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...commonOptions,
+                plugins: {
+                    ...commonOptions.plugins,
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ₹${value.toLocaleString('en-IN')} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Render Customer Demographics Chart
+    function renderCustomerDemographicsChart(insights) {
+        const ctx = document.getElementById('customer-demographics-chart').getContext('2d');
+        
+        // Group customers by location
+        const locationCounts = {};
+        insights.customers.forEach(customer => {
+            if (!locationCounts[customer.location]) {
+                locationCounts[customer.location] = 0;
+            }
+            locationCounts[customer.location]++;
+        });
+        
+        const locations = Object.keys(locationCounts);
+        const counts = Object.values(locationCounts);
+        
+        new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: locations,
+                datasets: [{
+                    data: counts,
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(153, 102, 255, 0.7)',
+                        'rgba(255, 159, 64, 0.7)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...commonOptions,
+                plugins: {
+                    ...commonOptions.plugins,
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ${value} customers (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
+

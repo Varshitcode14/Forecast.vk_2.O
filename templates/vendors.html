@@ -1,0 +1,606 @@
+{% extends "base.html" %}
+
+{% block title %}Vendors - KKK Enterprises{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <h2>Vendor Management</h2>
+  <p>Manage your supplier relationships and information.</p>
+</section>
+
+<div class="summary-cards">
+  <div class="summary-card">
+      <h4>Total Vendors</h4>
+      <span class="amount" id="total-vendors">0</span>
+      <span class="trend">Active suppliers</span>
+  </div>
+  <div class="summary-card">
+      <h4>Total Purchases</h4>
+      <span class="amount" id="total-purchases">₹0</span>
+      <span class="trend">Expenditure</span>
+  </div>
+  <div class="summary-card">
+      <h4>Recent Activity</h4>
+      <span class="amount" id="recent-activity">0</span>
+      <span class="trend">Purchases in last 30 days</span>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+      <h3>Vendors</h3>
+      <button id="add-vendor-btn" class="btn btn-secondary">Add New Vendor</button>
+  </div>
+  <div class="table-container">
+      <table id="vendors-table">
+          <thead>
+              <tr>
+                  <th>GST ID</th>
+                  <th>Name</th>
+                  <th>Contact Person</th>
+                  <th>Phone</th>
+                  <th>Location</th>
+                  <th>Actions</th>
+              </tr>
+          </thead>
+          <tbody id="vendors-list">
+              <!-- Vendors will be loaded here dynamically -->
+          </tbody>
+      </table>
+  </div>
+</div>
+
+<!-- Add Vendor Modal -->
+<div id="add-vendor-modal" class="modal">
+  <div class="modal-content">
+      <div class="modal-header">
+          <h3>Add New Vendor</h3>
+          <span class="close">&times;</span>
+      </div>
+      <div class="modal-body">
+          <form id="add-vendor-form">
+              <div class="form-group">
+                  <label for="vendor-gst">GST ID</label>
+                  <input type="text" id="vendor-gst" name="gst_id" required>
+              </div>
+              <div class="form-group">
+                  <label for="vendor-name">Vendor Name</label>
+                  <input type="text" id="vendor-name" name="name" required>
+              </div>
+              <div class="form-group">
+                  <label for="vendor-contact">Contact Person</label>
+                  <input type="text" id="vendor-contact" name="contact_person">
+              </div>
+              <div class="form-group">
+                  <label for="vendor-phone">Phone</label>
+                  <input type="text" id="vendor-phone" name="phone">
+              </div>
+              <div class="form-group">
+                  <label for="vendor-location">Location</label>
+                  <input type="text" id="vendor-location" name="location" required>
+              </div>
+              <div class="form-group">
+                  <label for="vendor-about">About</label>
+                  <textarea id="vendor-about" name="about" rows="4" placeholder="Enter vendor details, products they supply, etc."></textarea>
+              </div>
+              <div class="form-actions">
+                  <button type="button" class="btn btn-secondary" id="cancel-vendor">Cancel</button>
+                  <button type="submit" class="btn">Save Vendor</button>
+              </div>
+          </form>
+      </div>
+  </div>
+</div>
+
+<!-- Edit Vendor Modal -->
+<div id="edit-vendor-modal" class="modal">
+  <div class="modal-content">
+      <div class="modal-header">
+          <h3>Edit Vendor</h3>
+          <span class="close">&times;</span>
+      </div>
+      <div class="modal-body">
+          <form id="edit-vendor-form">
+              <input type="hidden" id="edit-vendor-id" name="id">
+              <div class="form-group">
+                  <label for="edit-vendor-gst">GST ID</label>
+                  <input type="text" id="edit-vendor-gst" name="gst_id" readonly>
+              </div>
+              <div class="form-group">
+                  <label for="edit-vendor-name">Vendor Name</label>
+                  <input type="text" id="edit-vendor-name" name="name" required>
+              </div>
+              <div class="form-group">
+                  <label for="edit-vendor-contact">Contact Person</label>
+                  <input type="text" id="edit-vendor-contact" name="contact_person">
+              </div>
+              <div class="form-group">
+                  <label for="edit-vendor-phone">Phone</label>
+                  <input type="text" id="edit-vendor-phone" name="phone">
+              </div>
+              <div class="form-group">
+                  <label for="edit-vendor-location">Location</label>
+                  <input type="text" id="edit-vendor-location" name="location" required>
+              </div>
+              <div class="form-group">
+                  <label for="edit-vendor-about">About</label>
+                  <textarea id="edit-vendor-about" name="about" rows="4" placeholder="Enter vendor details, products they supply, etc."></textarea>
+              </div>
+              <div class="form-actions">
+                  <button type="button" class="btn btn-secondary" id="cancel-edit-vendor">Cancel</button>
+                  <button type="submit" class="btn">Update Vendor</button>
+              </div>
+          </form>
+      </div>
+  </div>
+</div>
+
+<!-- Delete Vendor Confirmation Modal -->
+<div id="delete-vendor-modal" class="modal">
+  <div class="modal-content">
+      <div class="modal-header">
+          <h3>Confirm Delete</h3>
+          <span class="close">&times;</span>
+      </div>
+      <div class="modal-body">
+          <p>Are you sure you want to delete this vendor? This action cannot be undone.</p>
+          <input type="hidden" id="delete-vendor-id">
+          <div class="form-actions">
+              <button type="button" class="btn btn-secondary" id="cancel-delete-vendor">Cancel</button>
+              <button type="button" class="btn btn-danger" id="confirm-delete-vendor">Delete</button>
+          </div>
+      </div>
+  </div>
+</div>
+
+<!-- View Vendor Details Modal -->
+<div id="view-vendor-modal" class="modal">
+  <div class="modal-content">
+      <div class="modal-header">
+          <h3>Vendor Details</h3>
+          <span class="close">&times;</span>
+      </div>
+      <div class="modal-body" id="vendor-details-content">
+          <!-- Vendor details will be loaded here dynamically -->
+      </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Modal Styles */
+  .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0, 0, 0, 0.5);
+  }
+
+  .modal-content {
+      background-color: var(--primary-light);
+      margin: 10% auto;
+      padding: 0;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      width: 90%;
+      max-width: 500px;
+      animation: modalFadeIn 0.3s;
+      max-height: 80vh;
+      overflow-y: auto;
+  }
+
+  @keyframes modalFadeIn {
+      from {opacity: 0; transform: translateY(-20px);}
+      to {opacity: 1; transform: translateY(0);}
+  }
+
+  .modal-header {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      background-color: var(--primary-light);
+      z-index: 10;
+  }
+
+  .modal-header h3 {
+      margin: 0;
+      color: var(--secondary-color);
+  }
+
+  .close {
+      color: var(--secondary-color);
+      font-size: 1.5rem;
+      font-weight: bold;
+      cursor: pointer;
+  }
+
+  .close:hover {
+      color: var(--accent-color);
+  }
+
+  .modal-body {
+      padding: 1.5rem;
+  }
+
+  /* Form Styles */
+  .form-group {
+      margin-bottom: 1.2rem;
+  }
+
+  .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: var(--secondary-color);
+  }
+
+  .form-group input, .form-group select, .form-group textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      background-color: rgba(255, 255, 255, 0.1);
+      color: var(--secondary-color);
+  }
+
+  .form-group textarea {
+      resize: vertical;
+      min-height: 100px;
+  }
+
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      outline: none;
+      border-color: var(--accent-color);
+      box-shadow: 0 0 0 2px rgba(240, 248, 255, 0.2);
+  }
+
+  .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 1rem;
+      margin-top: 1.5rem;
+  }
+
+  .btn-danger {
+      background-color: #f44336;
+  }
+
+  .btn-danger:hover {
+      background-color: #d32f2f;
+  }
+
+  /* Vendor Details Styles */
+  .vendor-detail-section {
+      margin-bottom: 1.5rem;
+  }
+
+  .vendor-detail-section h4 {
+      color: var(--secondary-color);
+      margin-bottom: 0.8rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .detail-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+  }
+
+  .detail-label {
+      color: var(--text-color);
+      opacity: 0.8;
+  }
+
+  .detail-value {
+      color: var(--secondary-color);
+      font-weight: 500;
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+      // DOM Elements
+      const vendorsTable = document.getElementById('vendors-table');
+      const vendorsList = document.getElementById('vendors-list');
+      const addVendorBtn = document.getElementById('add-vendor-btn');
+      const addVendorModal = document.getElementById('add-vendor-modal');
+      const editVendorModal = document.getElementById('edit-vendor-modal');
+      const deleteVendorModal = document.getElementById('delete-vendor-modal');
+      const viewVendorModal = document.getElementById('view-vendor-modal');
+      const addVendorForm = document.getElementById('add-vendor-form');
+      const editVendorForm = document.getElementById('edit-vendor-form');
+      const totalVendors = document.getElementById('total-vendors');
+      const totalPurchases = document.getElementById('total-purchases');
+      const recentActivity = document.getElementById('recent-activity');
+
+      // Close buttons
+      const closeButtons = document.querySelectorAll('.close');
+      closeButtons.forEach(button => {
+          button.addEventListener('click', function() {
+              addVendorModal.style.display = 'none';
+              editVendorModal.style.display = 'none';
+              deleteVendorModal.style.display = 'none';
+              viewVendorModal.style.display = 'none';
+          });
+      });
+
+      // Cancel buttons
+      document.getElementById('cancel-vendor').addEventListener('click', function() {
+          addVendorModal.style.display = 'none';
+      });
+
+      document.getElementById('cancel-edit-vendor').addEventListener('click', function() {
+          editVendorModal.style.display = 'none';
+      });
+
+      document.getElementById('cancel-delete-vendor').addEventListener('click', function() {
+          deleteVendorModal.style.display = 'none';
+      });
+
+      // Show Add Vendor Modal
+      addVendorBtn.addEventListener('click', function() {
+          addVendorForm.reset();
+          addVendorModal.style.display = 'block';
+      });
+
+      // Add Vendor Form Submit
+      addVendorForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          
+          const vendorData = {
+              gst_id: document.getElementById('vendor-gst').value,
+              name: document.getElementById('vendor-name').value,
+              contact_person: document.getElementById('vendor-contact').value,
+              phone: document.getElementById('vendor-phone').value,
+              location: document.getElementById('vendor-location').value,
+              about: document.getElementById('vendor-about').value
+          };
+          
+          fetch('/api/vendors', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(vendorData)
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  addVendorModal.style.display = 'none';
+                  loadVendors();
+              } else {
+                  alert(data.message || 'Error adding vendor');
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert('An error occurred while adding the vendor');
+          });
+      });
+
+      // Edit Vendor Form Submit
+      editVendorForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          
+          const vendorId = document.getElementById('edit-vendor-id').value;
+          const vendorData = {
+              name: document.getElementById('edit-vendor-name').value,
+              contact_person: document.getElementById('edit-vendor-contact').value,
+              phone: document.getElementById('edit-vendor-phone').value,
+              location: document.getElementById('edit-vendor-location').value,
+              about: document.getElementById('edit-vendor-about').value
+          };
+          
+          fetch(`/api/vendors/${vendorId}`, {
+              method: 'PUT',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(vendorData)
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  editVendorModal.style.display = 'none';
+                  loadVendors();
+              } else {
+                  alert(data.message || 'Error updating vendor');
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert('An error occurred while updating the vendor');
+          });
+      });
+
+      // Confirm Delete Vendor
+      document.getElementById('confirm-delete-vendor').addEventListener('click', function() {
+          const vendorId = document.getElementById('delete-vendor-id').value;
+          
+          fetch(`/api/vendors/${vendorId}`, {
+              method: 'DELETE'
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  deleteVendorModal.style.display = 'none';
+                  loadVendors();
+              } else {
+                  alert(data.message || 'Error deleting vendor');
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert('An error occurred while deleting the vendor');
+          });
+      });
+
+      // Load Vendors
+      function loadVendors() {
+          fetch('/api/vendors')
+              .then(response => response.json())
+              .then(data => {
+                  vendorsList.innerHTML = '';
+                  
+                  data.forEach(vendor => {
+                      const row = document.createElement('tr');
+                      
+                      row.innerHTML = `
+                          <td>${vendor.gst_id}</td>
+                          <td>${vendor.name}</td>
+                          <td>${vendor.contact_person || '-'}</td>
+                          <td>${vendor.phone || '-'}</td>
+                          <td>${vendor.location}</td>
+                          <td>
+                              <button class="btn btn-secondary view-vendor" data-id="${vendor.id}" data-vendor="${encodeURIComponent(JSON.stringify(vendor))}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem; margin-right: 0.5rem;">View</button>
+                              <button class="btn btn-secondary edit-vendor" data-id="${vendor.id}" data-vendor="${encodeURIComponent(JSON.stringify(vendor))}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem; margin-right: 0.5rem;">Edit</button>
+                              <button class="btn btn-danger delete-vendor" data-id="${vendor.id}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem;">Delete</button>
+                          </td>
+                      `;
+                      
+                      vendorsList.appendChild(row);
+                  });
+                  
+                  // Update total vendors count
+                  totalVendors.textContent = data.length;
+                  
+                  // Add event listeners to view, edit, and delete buttons
+                  document.querySelectorAll('.view-vendor').forEach(button => {
+                      button.addEventListener('click', function() {
+                          const vendorData = JSON.parse(decodeURIComponent(this.getAttribute('data-vendor')));
+                          showVendorDetails(vendorData);
+                      });
+                  });
+                  
+                  document.querySelectorAll('.edit-vendor').forEach(button => {
+                      button.addEventListener('click', function() {
+                          const vendorData = JSON.parse(decodeURIComponent(this.getAttribute('data-vendor')));
+                          
+                          document.getElementById('edit-vendor-id').value = vendorData.id;
+                          document.getElementById('edit-vendor-gst').value = vendorData.gst_id;
+                          document.getElementById('edit-vendor-name').value = vendorData.name;
+                          document.getElementById('edit-vendor-contact').value = vendorData.contact_person || '';
+                          document.getElementById('edit-vendor-phone').value = vendorData.phone || '';
+                          document.getElementById('edit-vendor-location').value = vendorData.location;
+                          document.getElementById('edit-vendor-about').value = vendorData.about || '';
+                          
+                          editVendorModal.style.display = 'block';
+                      });
+                  });
+                  
+                  document.querySelectorAll('.delete-vendor').forEach(button => {
+                      button.addEventListener('click', function() {
+                          const vendorId = this.getAttribute('data-id');
+                          document.getElementById('delete-vendor-id').value = vendorId;
+                          deleteVendorModal.style.display = 'block';
+                      });
+                  });
+              })
+              .catch(error => {
+                  console.error('Error:', error);
+                  alert('An error occurred while loading vendors');
+              });
+      }
+
+      // Show Vendor Details
+      function showVendorDetails(vendor) {
+          const vendorDetailsContent = `
+              <div class="vendor-detail-section">
+                  <h4>Vendor Information</h4>
+                  <div class="detail-row">
+                      <span class="detail-label">GST ID:</span>
+                      <span class="detail-value">${vendor.gst_id}</span>
+                  </div>
+                  <div class="detail-row">
+                      <span class="detail-label">Name:</span>
+                      <span class="detail-value">${vendor.name}</span>
+                  </div>
+                  <div class="detail-row">
+                      <span class="detail-label">Contact Person:</span>
+                      <span class="detail-value">${vendor.contact_person || '-'}</span>
+                  </div>
+                  <div class="detail-row">
+                      <span class="detail-label">Phone:</span>
+                      <span class="detail-value">${vendor.phone || '-'}</span>
+                  </div>
+                  <div class="detail-row">
+                      <span class="detail-label">Location:</span>
+                      <span class="detail-value">${vendor.location}</span>
+                  </div>
+              </div>
+              
+              <div class="vendor-detail-section">
+                  <h4>About</h4>
+                  <p>${vendor.about || 'No additional information available.'}</p>
+              </div>
+          `;
+          
+          document.getElementById('vendor-details-content').innerHTML = vendorDetailsContent;
+          viewVendorModal.style.display = 'block';
+      }
+
+      // Load Purchases Summary
+      function loadPurchasesSummary() {
+          fetch('/api/purchases')
+              .then(response => response.json())
+              .then(purchases => {
+                  let totalPurchasesAmount = 0;
+                  let recentPurchasesCount = 0;
+                  
+                  const today = new Date();
+                  const thirtyDaysAgo = new Date(today);
+                  thirtyDaysAgo.setDate(today.getDate() - 30);
+                  
+                  purchases.forEach(purchase => {
+                      totalPurchasesAmount += purchase.total_amount;
+                      
+                      const purchaseDate = new Date(purchase.purchase_date);
+                      if (purchaseDate >= thirtyDaysAgo) {
+                          recentPurchasesCount++;
+                      }
+                  });
+                  
+                  totalPurchases.textContent = `₹${totalPurchasesAmount.toFixed(2)}`;
+                  recentActivity.textContent = recentPurchasesCount;
+              })
+              .catch(error => {
+                  console.error('Error:', error);
+              });
+      }
+
+      // Initial load
+      loadVendors();
+      loadPurchasesSummary();
+
+      // Close modal when clicking outside
+      window.addEventListener('click', function(event) {
+          if (event.target === addVendorModal) {
+              addVendorModal.style.display = 'none';
+          }
+          if (event.target === editVendorModal) {
+              editVendorModal.style.display = 'none';
+          }
+          if (event.target === deleteVendorModal) {
+              deleteVendorModal.style.display = 'none';
+          }
+          if (event.target === viewVendorModal) {
+              viewVendorModal.style.display = 'none';
+          }
+      });
+  });
+</script>
+{% endblock %}
+

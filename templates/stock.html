@@ -1,0 +1,502 @@
+{% extends "base.html" %}
+
+{% block title %}Stock - KKK Enterprises{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <h2>Stock Management</h2>
+  <p>Keep track of your inventory and stock levels.</p>
+</section>
+
+<div class="row" style="margin-bottom: 2rem;">
+  <div class="summary-card">
+      <h4>Total Products</h4>
+      <span class="amount" id="total-products">0</span>
+      <span class="trend">Products in inventory</span>
+  </div>
+  <div class="summary-card">
+      <h4>Low Stock</h4>
+      <span class="amount" id="low-stock">0</span>
+      <span class="trend down">Needs attention</span>
+  </div>
+  <div class="summary-card">
+      <h4>Out of Stock</h4>
+      <span class="amount" id="out-of-stock">0</span>
+      <span class="trend down">Action required</span>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+      <h3>Products Inventory</h3>
+      <button id="add-product-btn" class="btn btn-secondary">Add New Product</button>
+  </div>
+  <div class="table-container">
+      <table id="products-table">
+          <thead>
+              <tr>
+                  <th>Product ID</th>
+                  <th>Name</th>
+                  <th>Quantity</th>
+                  <th>Cost per Unit</th>
+                  <th>Specifications</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+              </tr>
+          </thead>
+          <tbody id="products-list">
+              <!-- Products will be loaded here dynamically -->
+          </tbody>
+      </table>
+  </div>
+</div>
+
+<!-- Add Product Modal -->
+<div id="add-product-modal" class="modal">
+  <div class="modal-content">
+      <div class="modal-header">
+          <h3>Add New Product</h3>
+          <span class="close">&times;</span>
+      </div>
+      <div class="modal-body">
+          <form id="add-product-form">
+              <div class="form-group">
+                  <label for="product-id">Product ID</label>
+                  <input type="text" id="product-id" name="product_id" required>
+              </div>
+              <div class="form-group">
+                  <label for="product-name">Product Name</label>
+                  <input type="text" id="product-name" name="name" required>
+              </div>
+              <div class="form-group">
+                  <label for="product-quantity">Quantity</label>
+                  <input type="number" id="product-quantity" name="quantity" min="0" required>
+              </div>
+              <div class="form-group">
+                  <label for="product-cost">Cost per Unit (₹)</label>
+                  <input type="number" id="product-cost" name="cost_per_unit" min="0" step="0.01" required>
+              </div>
+              <div class="form-group">
+                  <label for="product-specifications">Specifications</label>
+                  <textarea id="product-specifications" name="specifications" rows="4" placeholder="Enter product specifications"></textarea>
+              </div>
+              <div class="form-actions">
+                  <button type="button" class="btn btn-secondary" id="cancel-product">Cancel</button>
+                  <button type="submit" class="btn">Save Product</button>
+              </div>
+          </form>
+      </div>
+  </div>
+</div>
+
+<!-- Edit Product Modal -->
+<div id="edit-product-modal" class="modal">
+  <div class="modal-content">
+      <div class="modal-header">
+          <h3>Edit Product</h3>
+          <span class="close">&times;</span>
+      </div>
+      <div class="modal-body">
+          <form id="edit-product-form">
+              <input type="hidden" id="edit-product-id" name="id">
+              <div class="form-group">
+                  <label for="edit-product-code">Product ID</label>
+                  <input type="text" id="edit-product-code" name="product_id" readonly>
+              </div>
+              <div class="form-group">
+                  <label for="edit-product-name">Product Name</label>
+                  <input type="text" id="edit-product-name" name="name" required>
+              </div>
+              <div class="form-group">
+                  <label for="edit-product-quantity">Quantity</label>
+                  <input type="number" id="edit-product-quantity" name="quantity" min="0" required>
+              </div>
+              <div class="form-group">
+                  <label for="edit-product-cost">Cost per Unit (₹)</label>
+                  <input type="number" id="edit-product-cost" name="cost_per_unit" min="0" step="0.01" required>
+              </div>
+              <div class="form-group">
+                  <label for="edit-product-specifications">Specifications</label>
+                  <textarea id="edit-product-specifications" name="specifications" rows="4" placeholder="Enter product specifications"></textarea>
+              </div>
+              <div class="form-actions">
+                  <button type="button" class="btn btn-secondary" id="cancel-edit-product">Cancel</button>
+                  <button type="submit" class="btn">Update Product</button>
+              </div>
+          </form>
+      </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-confirm-modal" class="modal">
+  <div class="modal-content">
+      <div class="modal-header">
+          <h3>Confirm Delete</h3>
+          <span class="close">&times;</span>
+      </div>
+      <div class="modal-body">
+          <p>Are you sure you want to delete this product? This action cannot be undone.</p>
+          <input type="hidden" id="delete-product-id">
+          <div class="form-actions">
+              <button type="button" class="btn btn-secondary" id="cancel-delete">Cancel</button>
+              <button type="button" class="btn btn-danger" id="confirm-delete">Delete</button>
+          </div>
+      </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Modal Styles */
+  .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0, 0, 0, 0.5);
+  }
+
+  .modal-content {
+      background-color: var(--primary-light);
+      margin: 10% auto;
+      padding: 0;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      width: 90%;
+      max-width: 500px;
+      animation: modalFadeIn 0.3s;
+  }
+
+  @keyframes modalFadeIn {
+      from {opacity: 0; transform: translateY(-20px);}
+      to {opacity: 1; transform: translateY(0);}
+  }
+
+  .modal-header {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+  }
+
+  .modal-header h3 {
+      margin: 0;
+      color: var(--secondary-color);
+  }
+
+  .close {
+      color: var(--secondary-color);
+      font-size: 1.5rem;
+      font-weight: bold;
+      cursor: pointer;
+  }
+
+  .close:hover {
+      color: var(--accent-color);
+  }
+
+  .modal-body {
+      padding: 1.5rem;
+  }
+
+  /* Form Styles */
+  .form-group {
+      margin-bottom: 1.2rem;
+  }
+
+  .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: var(--secondary-color);
+  }
+
+  .form-group input, .form-group select, .form-group textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      background-color: rgba(255, 255, 255, 0.1);
+      color: var(--secondary-color);
+  }
+
+  .form-group textarea {
+      resize: vertical;
+      min-height: 100px;
+  }
+
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      outline: none;
+      border-color: var(--accent-color);
+      box-shadow: 0 0 0 2px rgba(240, 248, 255, 0.2);
+  }
+
+  .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 1rem;
+      margin-top: 1.5rem;
+  }
+
+  .btn-danger {
+      background-color: #f44336;
+  }
+
+  .btn-danger:hover {
+      background-color: #d32f2f;
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+      // DOM Elements
+      const productsTable = document.getElementById('products-table');
+      const productsList = document.getElementById('products-list');
+      const addProductBtn = document.getElementById('add-product-btn');
+      const addProductModal = document.getElementById('add-product-modal');
+      const editProductModal = document.getElementById('edit-product-modal');
+      const deleteConfirmModal = document.getElementById('delete-confirm-modal');
+      const addProductForm = document.getElementById('add-product-form');
+      const editProductForm = document.getElementById('edit-product-form');
+      const totalProductsEl = document.getElementById('total-products');
+      const lowStockEl = document.getElementById('low-stock');
+      const outOfStockEl = document.getElementById('out-of-stock');
+
+      // Close buttons
+      const closeButtons = document.querySelectorAll('.close');
+      closeButtons.forEach(button => {
+          button.addEventListener('click', function() {
+              addProductModal.style.display = 'none';
+              editProductModal.style.display = 'none';
+              deleteConfirmModal.style.display = 'none';
+          });
+      });
+
+      // Cancel buttons
+      document.getElementById('cancel-product').addEventListener('click', function() {
+          addProductModal.style.display = 'none';
+      });
+
+      document.getElementById('cancel-edit-product').addEventListener('click', function() {
+          editProductModal.style.display = 'none';
+      });
+
+      document.getElementById('cancel-delete').addEventListener('click', function() {
+          deleteConfirmModal.style.display = 'none';
+      });
+
+      // Show Add Product Modal
+      addProductBtn.addEventListener('click', function() {
+          addProductForm.reset();
+          addProductModal.style.display = 'block';
+      });
+
+      // Add Product Form Submit
+      addProductForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          
+          const productData = {
+              product_id: document.getElementById('product-id').value,
+              name: document.getElementById('product-name').value,
+              quantity: parseInt(document.getElementById('product-quantity').value),
+              cost_per_unit: parseFloat(document.getElementById('product-cost').value),
+              specifications: document.getElementById('product-specifications').value
+          };
+          
+          fetch('/api/products', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(productData)
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  addProductModal.style.display = 'none';
+                  loadProducts();
+              } else {
+                  alert(data.message || 'Error adding product');
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert('An error occurred while adding the product');
+          });
+      });
+
+      // Edit Product Form Submit
+      editProductForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          
+          const productId = document.getElementById('edit-product-id').value;
+          const productData = {
+              name: document.getElementById('edit-product-name').value,
+              quantity: parseInt(document.getElementById('edit-product-quantity').value),
+              cost_per_unit: parseFloat(document.getElementById('edit-product-cost').value),
+              specifications: document.getElementById('edit-product-specifications').value
+          };
+          
+          fetch(`/api/products/${productId}`, {
+              method: 'PUT',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(productData)
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  editProductModal.style.display = 'none';
+                  loadProducts();
+              } else {
+                  alert(data.message || 'Error updating product');
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert('An error occurred while updating the product');
+          });
+      });
+
+      // Confirm Delete Product
+      document.getElementById('confirm-delete').addEventListener('click', function() {
+          const productId = document.getElementById('delete-product-id').value;
+          
+          fetch(`/api/products/${productId}`, {
+              method: 'DELETE'
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  deleteConfirmModal.style.display = 'none';
+                  loadProducts();
+              } else {
+                  alert(data.message || 'Error deleting product');
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert('An error occurred while deleting the product');
+          });
+      });
+
+      // Load Products
+      function loadProducts() {
+          fetch('/api/products')
+              .then(response => response.json())
+              .then(products => {
+                  productsList.innerHTML = '';
+                  
+                  let totalProducts = products.length;
+                  let lowStock = 0;
+                  let outOfStock = 0;
+                  
+                  products.forEach(product => {
+                      const row = document.createElement('tr');
+                      
+                      // Determine status
+                      let status = '';
+                      let statusClass = '';
+                      
+                      if (product.quantity <= 0) {
+                          status = 'Out of Stock';
+                          statusClass = 'danger';
+                          outOfStock++;
+                      } else if (product.quantity <= 10) {
+                          status = 'Low Stock';
+                          statusClass = 'warning';
+                          lowStock++;
+                      } else {
+                          status = 'In Stock';
+                          statusClass = 'success';
+                      }
+                      
+                      // Truncate specifications for display
+                      const specDisplay = product.specifications ? 
+                          (product.specifications.length > 30 ? 
+                              product.specifications.substring(0, 30) + '...' : 
+                              product.specifications) : 
+                          '';
+                      
+                      row.innerHTML = `
+                          <td>${product.product_id}</td>
+                          <td>${product.name}</td>
+                          <td>${product.quantity}</td>
+                          <td>₹${product.cost_per_unit.toFixed(2)}</td>
+                          <td title="${product.specifications || ''}">${specDisplay}</td>
+                          <td><span style="color: ${statusClass === 'success' ? '#4caf50' : statusClass === 'warning' ? '#ff9800' : '#f44336'}; 
+                              background: ${statusClass === 'success' ? 'rgba(76, 175, 80, 0.1)' : statusClass === 'warning' ? 'rgba(255, 152, 0, 0.1)' : 'rgba(244, 67, 54, 0.1)'};
+                              padding: 0.3rem 0.6rem; border-radius: 4px;">${status}</span></td>
+                          <td>
+                              <button class="btn btn-secondary edit-product" data-id="${product.id}" data-product="${encodeURIComponent(JSON.stringify(product))}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem; margin-right: 0.5rem;">Edit</button>
+                              <button class="btn btn-danger delete-product" data-id="${product.id}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem;">Delete</button>
+                          </td>
+                      `;
+                      
+                      productsList.appendChild(row);
+                  });
+                  
+                  // Update summary cards
+                  totalProductsEl.textContent = totalProducts;
+                  lowStockEl.textContent = lowStock;
+                  outOfStockEl.textContent = outOfStock;
+                  
+                  // Add event listeners to edit and delete buttons
+                  document.querySelectorAll('.edit-product').forEach(button => {
+                      button.addEventListener('click', function() {
+                          const productData = JSON.parse(decodeURIComponent(this.getAttribute('data-product')));
+                          
+                          document.getElementById('edit-product-id').value = productData.id;
+                          document.getElementById('edit-product-code').value = productData.product_id;
+                          document.getElementById('edit-product-name').value = productData.name;
+                          document.getElementById('edit-product-quantity').value = productData.quantity;
+                          document.getElementById('edit-product-cost').value = productData.cost_per_unit;
+                          document.getElementById('edit-product-specifications').value = productData.specifications || '';
+                          
+                          editProductModal.style.display = 'block';
+                      });
+                  });
+                  
+                  document.querySelectorAll('.delete-product').forEach(button => {
+                      button.addEventListener('click', function() {
+                          const productId = this.getAttribute('data-id');
+                          document.getElementById('delete-product-id').value = productId;
+                          deleteConfirmModal.style.display = 'block';
+                      });
+                  });
+              })
+              .catch(error => {
+                  console.error('Error:', error);
+                  alert('An error occurred while loading products');
+              });
+      }
+
+      // Initial load
+      loadProducts();
+
+      // Close modal when clicking outside
+      window.addEventListener('click', function(event) {
+          if (event.target === addProductModal) {
+              addProductModal.style.display = 'none';
+          }
+          if (event.target === editProductModal) {
+              editProductModal.style.display = 'none';
+          }
+          if (event.target === deleteConfirmModal) {
+              deleteConfirmModal.style.display = 'none';
+          }
+      });
+  });
+</script>
+{% endblock %}
+

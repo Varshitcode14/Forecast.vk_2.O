@@ -1,0 +1,556 @@
+{% extends "base.html" %}
+
+{% block title %}Notifications - KKK Enterprises{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <h2>Notifications</h2>
+  <p>Stay updated with important alerts and messages.</p>
+</section>
+
+<!-- Inventory Alerts Section -->
+<div class="card alert-card" id="inventory-alerts" style="margin-bottom: 2rem; border-left: 4px solid #f44336;">
+  <div class="card-header" style="background-color: rgba(244, 67, 54, 0.1);">
+    <h3>⚠️ Inventory Alerts</h3>
+  </div>
+  <div class="card-body" style="padding: 1.5rem;">
+    <div id="inventory-alerts-content">
+      <!-- Inventory alerts will be loaded here dynamically -->
+    </div>
+  </div>
+</div>
+
+<!-- Today's Activity Section -->
+<div class="card" style="margin-bottom: 2rem; border-left: 4px solid #2196f3;">
+  <div class="card-header" style="background-color: rgba(33, 150, 243, 0.1);">
+    <h3>Today's Business Activity</h3>
+  </div>
+  <div class="card-body" style="padding: 1.5rem;">
+    <div id="todays-activity-content">
+      <!-- Today's activity will be loaded here dynamically -->
+    </div>
+  </div>
+</div>
+
+<!-- Daily Reports Section -->
+<div class="card" style="margin-bottom: 2rem;">
+  <div class="card-header">
+    <h3>Daily Business Reports</h3>
+  </div>
+  <div class="card-body" style="padding: 1.5rem;">
+    <div id="daily-reports-list">
+      <!-- Daily reports will be loaded here dynamically -->
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Alert Card Styles */
+  .alert-card {
+    transition: all 0.3s ease;
+  }
+  
+  .alert-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+  }
+  
+  .alert-item {
+    background-color: rgba(244, 67, 54, 0.1);
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    border-left: 3px solid #f44336;
+  }
+  
+  .alert-item:last-child {
+    margin-bottom: 0;
+  }
+  
+  .alert-title {
+    font-weight: 600;
+    color: #f44336;
+    margin-bottom: 0.5rem;
+  }
+  
+  .alert-message {
+    color: var(--text-color);
+  }
+  
+  .alert-action {
+    margin-top: 0.5rem;
+  }
+  
+  /* Report Card Styles */
+  .report-card {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border-left: 3px solid var(--accent-color);
+    transition: all 0.3s ease;
+  }
+  
+  .report-card:hover {
+    transform: translateY(-5px);
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+  
+  .report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+  
+  .report-title {
+    font-weight: 600;
+    color: var(--secondary-color);
+  }
+  
+  .report-date {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9rem;
+  }
+  
+  .report-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .report-metric {
+    text-align: center;
+  }
+  
+  .metric-label {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.8rem;
+    margin-bottom: 0.3rem;
+  }
+  
+  .metric-value {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--secondary-color);
+  }
+  
+  .report-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+  
+  .btn-sm {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.9rem;
+  }
+  
+  .loading-text {
+    text-align: center;
+    padding: 1rem;
+    color: rgba(255, 255, 255, 0.6);
+  }
+  
+  /* Activity Styles */
+  .activity-item {
+    display: flex;
+    align-items: center;
+    padding: 0.8rem;
+    border-radius: 8px;
+    background-color: rgba(255, 255, 255, 0.05);
+    margin-bottom: 0.8rem;
+  }
+  
+  .activity-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 1rem;
+    flex-shrink: 0;
+  }
+  
+  .activity-icon.sale {
+    background-color: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+  }
+  
+  .activity-icon.purchase {
+    background-color: rgba(33, 150, 243, 0.2);
+    color: #2196f3;
+  }
+  
+  .activity-content {
+    flex-grow: 1;
+  }
+  
+  .activity-title {
+    font-weight: 600;
+    color: var(--secondary-color);
+    margin-bottom: 0.3rem;
+  }
+  
+  .activity-details {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9rem;
+  }
+  
+  .activity-time {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.8rem;
+    margin-left: 1rem;
+    white-space: nowrap;
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load inventory alerts
+    loadInventoryAlerts();
+    
+    // Load today's activity
+    loadTodaysActivity();
+    
+    // Load daily reports
+    loadDailyReports();
+    
+    // Function to load inventory alerts
+    function loadInventoryAlerts() {
+        fetch('/api/products')
+            .then(response => response.json())
+            .then(products => {
+                const alertsContainer = document.getElementById('inventory-alerts-content');
+                
+                // Check for low stock and out of stock items
+                const lowStockThreshold = 10;
+                const lowStockItems = [];
+                const outOfStockItems = [];
+                
+                products.forEach(product => {
+                    if (product.quantity <= 0) {
+                        outOfStockItems.push(product);
+                    } else if (product.quantity <= lowStockThreshold) {
+                        lowStockItems.push(product);
+                    }
+                });
+                
+                // Generate alerts HTML
+                let alertsHTML = '';
+                
+                if (outOfStockItems.length === 0 && lowStockItems.length === 0) {
+                    alertsHTML = `
+                        <div class="alert-item" style="background-color: rgba(76, 175, 80, 0.1); border-left-color: #4caf50;">
+                            <div class="alert-title" style="color: #4caf50;">✓ Inventory Status Good</div>
+                            <div class="alert-message">All products have sufficient stock levels.</div>
+                        </div>
+                    `;
+                } else {
+                    if (outOfStockItems.length > 0) {
+                        alertsHTML += `
+                            <div class="alert-item">
+                                <div class="alert-title">⚠️ Out of Stock Items (${outOfStockItems.length})</div>
+                                <div class="alert-message">
+                                    The following products are out of stock:
+                                    <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                                        ${outOfStockItems.slice(0, 3).map(item => `<li>${item.name}</li>`).join('')}
+                                        ${outOfStockItems.length > 3 ? `<li>...and ${outOfStockItems.length - 3} more</li>` : ''}
+                                    </ul>
+                                </div>
+                                <div class="alert-action">
+                                    <a href="/stock" class="btn btn-secondary btn-sm">Manage Inventory</a>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    if (lowStockItems.length > 0) {
+                        alertsHTML += `
+                            <div class="alert-item" style="background-color: rgba(255, 152, 0, 0.1); border-left-color: #ff9800;">
+                                <div class="alert-title" style="color: #ff9800;">⚠️ Low Stock Items (${lowStockItems.length})</div>
+                                <div class="alert-message">
+                                    The following products are running low:
+                                    <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                                        ${lowStockItems.slice(0, 3).map(item => `<li>${item.name} (${item.quantity} left)</li>`).join('')}
+                                        ${lowStockItems.length > 3 ? `<li>...and ${lowStockItems.length - 3} more</li>` : ''}
+                                    </ul>
+                                </div>
+                                <div class="alert-action">
+                                    <a href="/stock" class="btn btn-secondary btn-sm">Manage Inventory</a>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+                
+                alertsContainer.innerHTML = alertsHTML;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('inventory-alerts-content').innerHTML = `
+                    <div class="alert-item">
+                        <div class="alert-title">Error Loading Alerts</div>
+                        <div class="alert-message">An error occurred while loading inventory alerts.</div>
+                    </div>
+                `;
+            });
+    }
+    
+    // Function to load today's activity
+    function loadTodaysActivity() {
+        console.log('Loading today\'s activity...');
+        // Get today's date
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        // Fetch sales and purchases
+        Promise.all([
+            fetch('/api/sales').then(response => {
+                console.log('Sales API response status:', response.status);
+                return response.json();
+            }),
+            fetch('/api/purchases').then(response => {
+                console.log('Purchases API response status:', response.status);
+                return response.json();
+            })
+        ])
+        .then(([sales, purchases]) => {
+            console.log('Loaded sales:', sales.length, 'records');
+            console.log('Loaded purchases:', purchases.length, 'records');
+            
+            const activityContainer = document.getElementById('todays-activity-content');
+            
+            // Filter today's sales and purchases
+            const todaySales = sales.filter(sale => {
+                const saleDate = new Date(sale.sale_date);
+                return saleDate >= today;
+            });
+            
+            const todayPurchases = purchases.filter(purchase => {
+                const purchaseDate = new Date(purchase.purchase_date);
+                return purchaseDate >= today;
+            });
+            
+            console.log('Today\'s sales:', todaySales.length, 'records');
+            console.log('Today\'s purchases:', todayPurchases.length, 'records');
+            
+            // Calculate totals
+            const totalSales = todaySales.reduce((sum, sale) => sum + sale.total_amount, 0);
+            const totalPurchases = todayPurchases.reduce((sum, purchase) => sum + purchase.total_amount, 0);
+            const netProfit = totalSales - totalPurchases;
+            const profitMargin = totalSales > 0 ? (netProfit / totalSales) * 100 : 0;
+            
+            // Generate activity HTML
+            if (todaySales.length === 0 && todayPurchases.length === 0) {
+                activityContainer.innerHTML = `<p class="loading-text">No business activity recorded today</p>`;
+                return;
+            }
+            
+            let activityHTML = `
+                <div class="report-card" style="margin-bottom: 1.5rem;">
+                    <div class="report-header">
+                        <div class="report-title">Today's Summary</div>
+                        <div class="report-date">${today.toLocaleDateString('en-US', { 
+                            weekday: 'long', 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                        })}</div>
+                    </div>
+                    <div class="report-summary">
+                        <div class="report-metric">
+                            <div class="metric-label">Sales</div>
+                            <div class="metric-value">₹${totalSales.toLocaleString('en-IN')}</div>
+                        </div>
+                        <div class="report-metric">
+                            <div class="metric-label">Purchases</div>
+                            <div class="metric-value">₹${totalPurchases.toLocaleString('en-IN')}</div>
+                        </div>
+                        <div class="report-metric">
+                            <div class="metric-label">Net Profit</div>
+                            <div class="metric-value">₹${netProfit.toLocaleString('en-IN')}</div>
+                        </div>
+                        <div class="report-metric">
+                            <div class="metric-label">Profit Margin</div>
+                            <div class="metric-value">${profitMargin.toFixed(1)}%</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Combine and sort activities by time
+            const allActivities = [
+                ...todaySales.map(sale => ({
+                    type: 'sale',
+                    time: new Date(sale.sale_date),
+                    data: sale
+                })),
+                ...todayPurchases.map(purchase => ({
+                    type: 'purchase',
+                    time: new Date(purchase.purchase_date),
+                    data: purchase
+                }))
+            ];
+            
+            // Sort by time (newest first)
+            allActivities.sort((a, b) => b.time - a.time);
+            
+            // Generate activity items
+            activityHTML += `<h4 style="margin-bottom: 1rem;">Recent Transactions</h4>`;
+            
+            allActivities.forEach(activity => {
+                const time = activity.time;
+                const timeString = time.toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit'
+                });
+                
+                if (activity.type === 'sale') {
+                    const sale = activity.data;
+                    activityHTML += `
+                        <div class="activity-item">
+                            <div class="activity-icon sale">₹</div>
+                            <div class="activity-content">
+                                <div class="activity-title">Sale to ${sale.customer_name}</div>
+                                <div class="activity-details">
+                                    Amount: ₹${sale.total_amount.toLocaleString('en-IN')} | 
+                                    Items: ${sale.items.length} | 
+                                    Products: ${sale.items.map(item => item.product_name).slice(0, 2).join(', ')}${sale.items.length > 2 ? '...' : ''}
+                                </div>
+                            </div>
+                            <div class="activity-time">${timeString}</div>
+                        </div>
+                    `;
+                } else {
+                    const purchase = activity.data;
+                    activityHTML += `
+                        <div class="activity-item">
+                            <div class="activity-icon purchase">₹</div>
+                            <div class="activity-content">
+                                <div class="activity-title">Purchase from ${purchase.vendor_name}</div>
+                                <div class="activity-details">
+                                    Amount: ₹${purchase.total_amount.toLocaleString('en-IN')} | 
+                                    Status: ${purchase.status} | 
+                                    Order ID: ${purchase.order_id}
+                                </div>
+                            </div>
+                            <div class="activity-time">${timeString}</div>
+                        </div>
+                    `;
+                }
+            });
+            
+            activityContainer.innerHTML = activityHTML;
+        })
+        .catch(error => {
+            console.error('Error loading today\'s activity:', error);
+            document.getElementById('todays-activity-content').innerHTML = `
+                <div class="alert-item">
+                    <div class="alert-title">Error Loading Activity</div>
+                    <div class="alert-message">An error occurred while loading today's business activity. Please try refreshing the page.</div>
+                </div>
+            `;
+        });
+    }
+    
+    // Function to load daily reports
+    function loadDailyReports() {
+        // Fetch reports from the API
+        fetch('/api/reports')
+            .then(response => response.json())
+            .then(reports => {
+                const reportsContainer = document.getElementById('daily-reports-list');
+                
+                // Generate reports HTML
+                if (reports.length === 0) {
+                    reportsContainer.innerHTML = `<p class="loading-text">No reports available yet</p>`;
+                    return;
+                }
+                
+                let reportsHTML = '';
+                
+                reports.forEach(report => {
+                    const startDate = new Date(report.start_date);
+                    const endDate = new Date(report.end_date);
+                    
+                    let dateDisplay;
+                    if (report.report_type === 'daily') {
+                        dateDisplay = startDate.toLocaleDateString('en-US', { 
+                            weekday: 'long', 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                        });
+                    } else if (report.report_type === 'weekly') {
+                        dateDisplay = `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+                    } else if (report.report_type === 'monthly') {
+                        dateDisplay = startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                    } else {
+                        dateDisplay = `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
+                    }
+                    
+                    const reportTitle = report.report_type.charAt(0).toUpperCase() + report.report_type.slice(1) + ' Report';
+                    
+                    reportsHTML += `
+                        <div class="report-card">
+                            <div class="report-header">
+                                <div class="report-title">${reportTitle}</div>
+                                <div class="report-date">${dateDisplay}</div>
+                            </div>
+                            <div class="report-summary">
+                                <div class="report-metric">
+                                    <div class="metric-label">Sales</div>
+                                    <div class="metric-value">₹${report.total_sales.toLocaleString('en-IN')}</div>
+                                </div>
+                                <div class="report-metric">
+                                    <div class="metric-label">Purchases</div>
+                                    <div class="metric-value">₹${report.total_purchases.toLocaleString('en-IN')}</div>
+                                </div>
+                                <div class="report-metric">
+                                    <div class="metric-label">Net Profit</div>
+                                    <div class="metric-value">₹${report.net_profit.toLocaleString('en-IN')}</div>
+                                </div>
+                                <div class="report-metric">
+                                    <div class="metric-label">Profit Margin</div>
+                                    <div class="metric-value">${report.profit_margin.toFixed(1)}%</div>
+                                </div>
+                            </div>
+                            ${(report.low_stock_count > 0 || report.out_of_stock_count > 0) ? `
+                                <div style="margin-bottom: 1rem;">
+                                    <span style="color: #f44336; font-weight: 600;">⚠️ Inventory Alert:</span>
+                                    ${report.out_of_stock_count > 0 ? `<span>${report.out_of_stock_count} out of stock</span>` : ''}
+                                    ${report.out_of_stock_count > 0 && report.low_stock_count > 0 ? ', ' : ''}
+                                    ${report.low_stock_count > 0 ? `<span>${report.low_stock_count} low stock</span>` : ''}
+                                </div>
+                            ` : ''}
+                            <div class="report-actions">
+                                <a href="/report?id=${report.id}" class="btn btn-secondary btn-sm">View Full Report</a>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                reportsContainer.innerHTML = reportsHTML;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('daily-reports-list').innerHTML = `
+                    <div class="alert-item">
+                        <div class="alert-title">Error Loading Reports</div>
+                        <div class="alert-message">An error occurred while loading business reports.</div>
+                    </div>
+                `;
+            });
+    }
+});
+</script>
+{% endblock %}
+

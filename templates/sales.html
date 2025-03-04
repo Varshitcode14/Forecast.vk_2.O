@@ -1,0 +1,1163 @@
+{% extends "base.html" %}
+
+{% block title %}Sales - KKK Enterprises{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <h2>Sales Management</h2>
+    <p>Track and manage your sales operations.</p>
+</section>
+
+<div class="summary-cards">
+    <div class="summary-card">
+        <h4>Today</h4>
+        <span class="amount" id="today-sales">₹0</span>
+        <span class="trend">Daily sales</span>
+    </div>
+    <div class="summary-card">
+        <h4>This Week</h4>
+        <span class="amount" id="week-sales">₹0</span>
+        <span class="trend">Weekly sales</span>
+    </div>
+    <div class="summary-card">
+        <h4>This Month</h4>
+        <span class="amount" id="month-sales">₹0</span>
+        <span class="trend">Monthly sales</span>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <h3>Sales Records</h3>
+        <div style="display: flex; gap: 10px;">
+            <button id="add-customer-btn" class="btn btn-secondary">Add New Customer</button>
+            <button id="add-sale-btn" class="btn btn-secondary">Add New Sale</button>
+        </div>
+    </div>
+    <div class="table-container">
+        <table id="sales-table">
+            <thead>
+                <tr>
+                    <th>Customer</th>
+                    <th>GST ID</th>
+                    <th>Date</th>
+                    <th>Products</th>
+                    <th>Total Amount</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="sales-list">
+                <!-- Sales will be loaded here dynamically -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Customer Modal -->
+<div id="add-customer-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Add New Customer</h3>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="add-customer-form">
+                <div class="form-group">
+                    <label for="customer-gst">GST ID</label>
+                    <input type="text" id="customer-gst" name="gst_id" required>
+                </div>
+                <div class="form-group">
+                    <label for="customer-name">Customer Name</label>
+                    <input type="text" id="customer-name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="customer-location">Location</label>
+                    <input type="text" id="customer-location" name="location" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-customer">Cancel</button>
+                    <button type="submit" class="btn">Save Customer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Sale Modal -->
+<div id="add-sale-modal" class="modal">
+    <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-header">
+            <h3>Add New Sale</h3>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="add-sale-form">
+                <div class="form-section">
+                    <div class="form-section-title">Customer Information</div>
+                    <div class="form-group">
+                        <label for="sale-customer">Customer</label>
+                        <select id="sale-customer" name="customer_id" required>
+                            <option value="">Select Customer</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="sale-gst-id">GST ID</label>
+                        <input type="text" id="sale-gst-id" name="gst_id" readonly>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <div class="form-section-title">Products</div>
+                    <div id="sale-items">
+                        <!-- Sale items will be added here -->
+                    </div>
+                    <button type="button" id="add-item-btn" class="btn btn-secondary">Add Another Product</button>
+                </div>
+
+                <div class="form-section">
+                    <div class="form-section-title">Order Summary</div>
+                    <div class="sale-item-grid-small">
+                        <div class="form-group">
+                            <label for="delivery-charges">Delivery Charges (₹)</label>
+                            <input type="number" id="delivery-charges" name="delivery_charges" min="0" value="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="total-amount">Total Amount (₹)</label>
+                            <input type="number" id="total-amount" name="total_amount" readonly>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-sale">Cancel</button>
+                    <button type="submit" class="btn">Save Sale</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- View Sale Details Modal -->
+<div id="view-sale-modal" class="modal">
+    <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-header">
+            <h3>Sale Details</h3>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body" id="sale-details-content">
+            <!-- Sale details will be loaded here dynamically -->
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Modal Styles */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0, 0, 0, 0.7);
+    }
+
+    .modal-content {
+        background-color: #1a1a95;
+        margin: 4% auto;
+        padding: 0;
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        width: 92%;
+        max-width: 800px;
+        animation: modalFadeIn 0.3s;
+        max-height: 92vh;
+        overflow-y: auto;
+    }
+
+    .modal-content::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .modal-content::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+    }
+
+    .modal-content::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 4px;
+    }
+
+    .modal-content::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.4);
+    }
+
+    .modal-header {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: sticky;
+        top: 0;
+        background-color: #1a1a95;
+        z-index: 10;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+    }
+
+    /* Form Styles */
+    .form-section {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .form-section-title {
+        color: var(--secondary-color);
+        font-size: 1.1rem;
+        font-weight: 500;
+        margin-bottom: 1.2rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .form-group {
+        margin-bottom: 1.2rem;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: var(--secondary-color);
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .form-group input,
+    .form-group select {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 6px;
+        background-color: rgba(255, 255, 255, 0.08);
+        color: var(--secondary-color);
+        font-size: 0.95rem;
+        transition: all 0.2s ease;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: var(--accent-color);
+        background-color: rgba(255, 255, 255, 0.12);
+        box-shadow: 0 0 0 3px rgba(240, 248, 255, 0.1);
+    }
+
+    .form-group input:disabled,
+    .form-group input:read-only,
+    .form-group select:disabled {
+        background-color: rgba(255, 255, 255, 0.04);
+        border-color: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.6);
+        cursor: not-allowed;
+    }
+
+    .sale-item {
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .sale-item-grid {
+        display: grid;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    @media (min-width: 768px) {
+        .sale-item-grid {
+            grid-template-columns: repeat(4, 1fr);
+        }
+        
+        .sale-item-grid-small {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+
+    @media (max-width: 767px) {
+        .sale-item-grid,
+        .sale-item-grid-small {
+            grid-template-columns: 1fr;
+        }
+        
+        .modal-content {
+            margin: 2% auto;
+            width: 95%;
+            max-height: 96vh;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .sale-item {
+            padding: 1rem;
+        }
+    }
+
+    .remove-item-container {
+        display: flex;
+        justify-content: flex-end;
+        margin: 1rem 0;
+    }
+
+    .btn-remove {
+        background-color: rgba(244, 67, 54, 0.1);
+        color: #f44336;
+        border: 1px solid rgba(244, 67, 54, 0.2);
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+    }
+
+    .btn-remove:hover {
+        background-color: rgba(244, 67, 54, 0.2);
+        border-color: rgba(244, 67, 54, 0.3);
+    }
+
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .btn {
+        padding: 0.75rem 1.5rem;
+        border-radius: 6px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .btn-secondary {
+        background-color: rgba(255, 255, 255, 0.1);
+        color: var(--secondary-color);
+    }
+
+    .btn-secondary:hover {
+        background-color: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Sale Details Styles */
+    .sale-detail-section {
+        margin-bottom: 1.5rem;
+    }
+
+    .sale-detail-section h4 {
+        color: var(--secondary-color);
+        margin-bottom: 0.8rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+    }
+
+    .detail-label {
+        color: var(--text-color);
+        opacity: 0.8;
+    }
+
+    .detail-value {
+        color: var(--secondary-color);
+        font-weight: 500;
+    }
+
+    .sale-item-grid {
+        display: grid;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    .sale-item-grid-small {
+        display: grid;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    @media (max-width: 768px) {
+        .sale-item-grid,
+        .sale-item-grid-small {
+            grid-template-columns: 1fr;
+            gap: 0.5rem;
+        }
+        
+        .form-group {
+            margin-bottom: 0.8rem;
+        }
+        
+        .modal-content {
+            margin: 2% auto;
+            width: 95%;
+        }
+    }
+
+    /* Enhanced Select Styles */
+    .form-group select {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 6px;
+        background-color: rgba(255, 255, 255, 0.08);
+        color: var(--secondary-color);
+        font-size: 0.95rem;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.75rem center;
+        background-size: 1em;
+        padding-right: 2.5rem;
+    }
+
+    .form-group select:focus {
+        outline: none;
+        border-color: var(--accent-color);
+        background-color: rgba(255, 255, 255, 0.12);
+        box-shadow: 0 0 0 3px rgba(240, 248, 255, 0.1);
+    }
+
+    .form-group select option {
+        background-color: var(--primary-dark);
+        color: var(--secondary-color);
+        padding: 0.75rem;
+    }
+
+    .form-group select option:checked {
+        background-color: var(--primary-light);
+    }
+
+    .form-group select option:hover {
+        background-color: var(--primary-light);
+    }
+
+    /* Webkit specific styles */
+    .form-group select::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .form-group select::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+    }
+
+    .form-group select::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 4px;
+    }
+
+    .form-group select::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.4);
+    }
+
+    /* Firefox specific styles */
+    .form-group select {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.1);
+    }
+
+    /* Disabled state */
+    .form-group select:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    /* Custom dropdown arrow for Firefox */
+    @-moz-document url-prefix() {
+        .form-group select {
+            text-indent: 0.01px;
+            text-overflow: '';
+        }
+    }
+
+    /* Ensure dropdown options are visible on mobile */
+    @media (max-width: 768px) {
+        .form-group select {
+            font-size: 16px; /* Prevents zoom on iOS */
+        }
+        
+        .form-group select option {
+            padding: 1rem 0.75rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM fully loaded');
+        
+        // DOM Elements - Get references after DOM is fully loaded
+        const salesTable = document.getElementById('sales-table');
+        const salesList = document.getElementById('sales-list');
+        const addSaleBtn = document.getElementById('add-sale-btn');
+        const addCustomerBtn = document.getElementById('add-customer-btn');
+        const addSaleModal = document.getElementById('add-sale-modal');
+        const addCustomerModal = document.getElementById('add-customer-modal');
+        const viewSaleModal = document.getElementById('view-sale-modal');
+        const addSaleForm = document.getElementById('add-sale-form');
+        const addCustomerForm = document.getElementById('add-customer-form');
+        const saleCustomerSelect = document.getElementById('sale-customer');
+        const saleGstId = document.getElementById('sale-gst-id');
+        const addItemBtn = document.getElementById('add-item-btn');
+        const saleItems = document.getElementById('sale-items');
+        const deliveryCharges = document.getElementById('delivery-charges');
+        const totalAmount = document.getElementById('total-amount');
+        const todaySales = document.getElementById('today-sales');
+        const weekSales = document.getElementById('week-sales');
+        const monthSales = document.getElementById('month-sales');
+
+        // Debug element references
+        console.log('Add Sale Button:', addSaleBtn);
+        console.log('Add Customer Button:', addCustomerBtn);
+        console.log('Add Item Button:', addItemBtn);
+        console.log('Sale Items Container:', saleItems);
+
+        // Global variables
+        let customers = [];
+        let products = [];
+        let itemCount = 0;
+
+        // Add this line to ensure sales are loaded immediately
+        loadSales();
+
+        // Close buttons
+        const closeButtons = document.querySelectorAll('.close');
+        closeButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                addSaleModal.style.display = 'none';
+                addCustomerModal.style.display = 'none';
+                viewSaleModal.style.display = 'none';
+            });
+        });
+
+        // Cancel buttons
+        document.getElementById('cancel-sale').addEventListener('click', function() {
+            addSaleModal.style.display = 'none';
+        });
+
+        document.getElementById('cancel-customer').addEventListener('click', function() {
+            addCustomerModal.style.display = 'none';
+        });
+
+        // Show Add Sale Modal
+        addSaleBtn.addEventListener('click', function() {
+            console.log('Add sale button clicked');
+            resetSaleForm();
+            loadCustomers();
+            loadProducts();
+            
+            // Ensure we have at least one sale item
+            if (saleItems.children.length === 0) {
+                console.log('Adding initial sale item');
+                addSaleItem();
+            }
+            
+            addSaleModal.style.display = 'block';
+        });
+
+        // Show Add Customer Modal
+        addCustomerBtn.addEventListener('click', function() {
+            console.log('Add customer button clicked');
+            addCustomerForm.reset();
+            addCustomerModal.style.display = 'block';
+        });
+
+        // Add Customer Form Submit
+        addCustomerForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            console.log('Customer form submitted');
+            
+            const customerData = {
+                gst_id: document.getElementById('customer-gst').value,
+                name: document.getElementById('customer-name').value,
+                location: document.getElementById('customer-location').value
+            };
+            
+            console.log('Customer data:', customerData);
+            
+            fetch('/api/customers', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(customerData)
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('Response data:', data);
+                if (data.success) {
+                    addCustomerModal.style.display = 'none';
+                    loadCustomers();
+                    // Select the newly added customer
+                    setTimeout(() => {
+                        saleCustomerSelect.value = data.customer.id;
+                        saleCustomerSelect.dispatchEvent(new Event('change'));
+                    }, 500);
+                } else {
+                    alert(data.message || 'Error adding customer');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while adding the customer');
+            });
+        });
+
+        // Customer Select Change
+        saleCustomerSelect.addEventListener('change', function() {
+            console.log('Customer selected:', this.value);
+            const selectedCustomerId = this.value;
+            if (selectedCustomerId) {
+                const selectedCustomer = customers.find(c => c.id == selectedCustomerId);
+                console.log('Selected customer:', selectedCustomer);
+                if (selectedCustomer) {
+                    saleGstId.value = selectedCustomer.gst_id;
+                    console.log('Set GST ID to:', selectedCustomer.gst_id);
+                } else {
+                    saleGstId.value = '';
+                    console.log('Customer not found in customers array');
+                }
+            } else {
+                saleGstId.value = '';
+                console.log('No customer selected');
+            }
+        });
+
+        // Add Item Button - FIXED
+        if (addItemBtn) {
+            console.log('Add item button found, adding event listener');
+            addItemBtn.addEventListener('click', function(e) {
+                console.log('Add item button clicked');
+                e.preventDefault(); // Prevent form submission
+                addSaleItem();
+            });
+        } else {
+            console.error('Add item button not found!');
+        }
+
+        // Add Sale Form Submit
+        addSaleForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            console.log('Sale form submitted');
+            
+            const customerId = saleCustomerSelect.value;
+            if (!customerId) {
+                alert('Please select a customer');
+                return;
+            }
+            
+            const saleData = {
+                customer_id: parseInt(customerId),
+                delivery_charges: parseFloat(deliveryCharges.value),
+                total_amount: parseFloat(totalAmount.value),
+                items: []
+            };
+            
+            // Get all sale items
+            const itemElements = document.querySelectorAll('.sale-item');
+            console.log('Found', itemElements.length, 'sale items');
+            
+            for (let i = 0; i < itemElements.length; i++) {
+                const item = itemElements[i];
+                const index = item.getAttribute('data-index');
+                
+                const productId = document.getElementById(`product-${index}`).value;
+                if (!productId) continue;
+                
+                const quantity = parseInt(document.getElementById(`quantity-${index}`).value);
+                const gstPercentage = parseFloat(document.getElementById(`gst-${index}`).value);
+                const discountPercentage = parseFloat(document.getElementById(`discount-${index}`).value);
+                const totalPrice = parseFloat(document.getElementById(`total-price-${index}`).value);
+                
+                saleData.items.push({
+                    product_id: parseInt(productId),
+                    quantity: quantity,
+                    gst_percentage: gstPercentage,
+                    discount_percentage: discountPercentage,
+                    total_price: totalPrice
+                });
+            }
+            
+            if (saleData.items.length === 0) {
+                alert('Please add at least one product');
+                return;
+            }
+            
+            console.log('Submitting sale data:', saleData);
+            
+            fetch('/api/sales', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(saleData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    addSaleModal.style.display = 'none';
+                    loadSales();
+                } else {
+                    alert(data.message || 'Error adding sale');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while adding the sale');
+            });
+        });
+
+        // Load Customers
+        function loadCustomers() {
+            console.log('Loading customers...');
+            fetch('/api/customers')
+                .then(response => response.json())
+                .then(data => {
+                    customers = data;
+                    console.log('Loaded', customers.length, 'customers');
+                    
+                    // Update customer select
+                    saleCustomerSelect.innerHTML = '<option value="">Select Customer</option>';
+                    
+                    data.forEach(customer => {
+                        const option = document.createElement('option');
+                        option.value = customer.id;
+                        option.textContent = customer.name;
+                        saleCustomerSelect.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading customers:', error);
+                    alert('An error occurred while loading customers');
+                });
+        }
+
+        // Load Products
+        function loadProducts() {
+            console.log('Loading products...');
+            fetch('/api/products')
+                .then(response => response.json())
+                .then(data => {
+                    products = data;
+                    console.log('Loaded', products.length, 'products');
+                    
+                    // Update product selects
+                    updateProductSelects();
+                })
+                .catch(error => {
+                    console.error('Error loading products:', error);
+                    alert('An error occurred while loading products');
+                });
+        }
+
+        // Update Product Selects
+        function updateProductSelects() {
+            const productSelects = document.querySelectorAll('.product-select');
+            console.log('Updating', productSelects.length, 'product selects');
+            
+            productSelects.forEach(select => {
+                const currentValue = select.value;
+                select.innerHTML = '<option value="">Select Product</option>';
+                
+                products.forEach(product => {
+                    if (product.quantity > 0) {
+                        const option = document.createElement('option');
+                        option.value = product.id;
+                        option.textContent = `${product.product_id} - ${product.name}`;
+                        select.appendChild(option);
+                    }
+                });
+                
+                // Restore selected value if it exists
+                if (currentValue) {
+                    select.value = currentValue;
+                }
+            });
+        }
+
+        // Add Sale Item - FIXED
+        function addSaleItem() {
+            console.log('Adding sale item with index:', itemCount);
+            
+            // Create a new div element for the sale item
+            const saleItem = document.createElement('div');
+            saleItem.className = 'sale-item';
+            saleItem.setAttribute('data-index', itemCount);
+            
+            // Set the HTML content for the sale item
+            saleItem.innerHTML = `
+                <div class="sale-item-grid">
+                    <div class="form-group">
+                        <label for="product-${itemCount}">Product</label>
+                        <select id="product-${itemCount}" name="product_id" class="product-select" required>
+                            <option value="">Select Product</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="product-name-${itemCount}">Product Name</label>
+                        <input type="text" id="product-name-${itemCount}" name="product_name" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="product-price-${itemCount}">Unit Price (₹)</label>
+                        <input type="number" id="product-price-${itemCount}" name="unit_price" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="quantity-${itemCount}">Quantity</label>
+                        <input type="number" id="quantity-${itemCount}" name="quantity" min="1" value="1" required class="quantity-input">
+                    </div>
+                </div>
+                
+                <div class="sale-item-grid-small">
+                    <div class="form-group">
+                        <label for="gst-${itemCount}">GST (%)</label>
+                        <input type="number" id="gst-${itemCount}" name="gst_percentage" min="0" max="28" value="18" required class="gst-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="discount-${itemCount}">Discount (%)</label>
+                        <input type="number" id="discount-${itemCount}" name="discount_percentage" min="0" max="100" value="0" required class="discount-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="total-price-${itemCount}">Total Price (₹)</label>
+                        <input type="number" id="total-price-${itemCount}" name="total_price" readonly>
+                    </div>
+                </div>
+                
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 1.5rem;">
+                    <button type="button" class="btn btn-danger remove-item" style="padding: 0.3rem 0.6rem; font-size: 0.9rem;">Remove</button>
+                </div>
+                
+                <hr style="border: none; border-top: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 1.5rem;">
+            `;
+            
+            // Append the sale item to the container
+            saleItems.appendChild(saleItem);
+            
+            // Update product selects
+            updateProductSelects();
+            
+            // Add event listeners
+            setupItemEventListeners(itemCount);
+            
+            // Increment the item count
+            itemCount++;
+            
+            console.log('Sale item added, new count:', itemCount);
+        }
+
+        // Setup Item Event Listeners
+        function setupItemEventListeners(index) {
+            console.log('Setting up event listeners for item', index);
+            
+            const productSelect = document.getElementById(`product-${index}`);
+            const productName = document.getElementById(`product-name-${index}`);
+            const productPrice = document.getElementById(`product-price-${index}`);
+            const quantity = document.getElementById(`quantity-${index}`);
+            const gst = document.getElementById(`gst-${index}`);
+            const discount = document.getElementById(`discount-${index}`);
+            const totalPrice = document.getElementById(`total-price-${index}`);
+            
+            if (!productSelect || !productName || !productPrice || !quantity || !gst || !discount || !totalPrice) {
+                console.error('One or more elements not found for item', index);
+                return;
+            }
+            
+            // Product select change
+            productSelect.addEventListener('change', function() {
+                const selectedProductId = this.value;
+                console.log('Product selected for item', index, ':', selectedProductId);
+                
+                if (selectedProductId) {
+                    const selectedProduct = products.find(p => p.id == selectedProductId);
+                    if (selectedProduct) {
+                        productName.value = selectedProduct.name;
+                        productPrice.value = selectedProduct.cost_per_unit.toFixed(2);
+                        
+                        // Update max quantity
+                        quantity.max = selectedProduct.quantity;
+                        
+                        // Calculate total price
+                        calculateItemTotal(index);
+                    } else {
+                        productName.value = '';
+                        productPrice.value = '';
+                    }
+                } else {
+                    productName.value = '';
+                    productPrice.value = '';
+                }
+            });
+            
+            // Quantity, GST, Discount change
+            [quantity, gst, discount].forEach(input => {
+                input.addEventListener('input', function() {
+                    calculateItemTotal(index);
+                });
+            });
+            
+            // Remove item button
+            const removeBtn = document.querySelector(`.sale-item[data-index="${index}"] .remove-item`);
+            if (removeBtn) {
+                removeBtn.addEventListener('click', function() {
+                    console.log('Remove button clicked for item', index);
+                    const item = document.querySelector(`.sale-item[data-index="${index}"]`);
+                    if (item) {
+                        item.remove();
+                        calculateOrderTotal();
+                    }
+                });
+            } else {
+                console.error('Remove button not found for item', index);
+            }
+        }
+
+        // Calculate Item Total
+        function calculateItemTotal(index) {
+            const productPrice = parseFloat(document.getElementById(`product-price-${index}`).value) || 0;
+            const quantity = parseInt(document.getElementById(`quantity-${index}`).value) || 0;
+            const gstPercentage = parseFloat(document.getElementById(`gst-${index}`).value) || 0;
+            const discountPercentage = parseFloat(document.getElementById(`discount-${index}`).value) || 0;
+            
+            const basePrice = productPrice * quantity;
+            const discountAmount = (basePrice * discountPercentage) / 100;
+            const priceAfterDiscount = basePrice - discountAmount;
+            const gstAmount = (priceAfterDiscount * gstPercentage) / 100;
+            const totalItemPrice = priceAfterDiscount + gstAmount;
+            
+            document.getElementById(`total-price-${index}`).value = totalItemPrice.toFixed(2);
+            
+            calculateOrderTotal();
+        }
+
+        // Calculate Order Total
+        function calculateOrderTotal() {
+            const totalPriceInputs = document.querySelectorAll('[id^="total-price-"]');
+            let subtotal = 0;
+            
+            totalPriceInputs.forEach(input => {
+                subtotal += parseFloat(input.value) || 0;
+            });
+            
+            const deliveryChargesValue = parseFloat(deliveryCharges.value) || 0;
+            const orderTotal = subtotal + deliveryChargesValue;
+            
+            totalAmount.value = orderTotal.toFixed(2);
+        }
+
+        // Reset Sale Form
+        function resetSaleForm() {
+            console.log('Resetting sale form');
+            addSaleForm.reset();
+            
+            // Clear all sale items
+            saleItems.innerHTML = '';
+            
+            // Add a new initial item
+            addSaleItem();
+            
+            // Reset totals
+            totalAmount.value = '';
+        }
+
+        // Load Sales
+        function loadSales() {
+            console.log('Loading sales data...');
+            fetch('/api/sales')
+                .then(response => {
+                    console.log('Sales API response status:', response.status);
+                    return response.json();
+                })
+                .then(sales => {
+                    console.log('Sales data loaded:', sales.length, 'records');
+                    salesList.innerHTML = '';
+                    
+                    let todayTotal = 0;
+                    let weekTotal = 0;
+                    let monthTotal = 0;
+                    
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    
+                    const weekStart = new Date(today);
+                    weekStart.setDate(today.getDate() - today.getDay());
+                    
+                    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                    
+                    sales.forEach(sale => {
+                        const row = document.createElement('tr');
+                        
+                        const saleDate = new Date(sale.sale_date);
+                        
+                        // Calculate summary totals
+                        if (saleDate >= today) {
+                            todayTotal += sale.total_amount;
+                        }
+                        
+                        if (saleDate >= weekStart) {
+                            weekTotal += sale.total_amount;
+                        }
+                        
+                        if (saleDate >= monthStart) {
+                            monthTotal += sale.total_amount;
+                        }
+                        
+                        // Format products list
+                        const productsList = sale.items.map(item => item.product_name).join(', ');
+                        
+                        row.innerHTML = `
+                            <td>${sale.customer_name}</td>
+                            <td>${sale.customer_gst_id}</td>
+                            <td>${new Date(sale.sale_date).toLocaleDateString()}</td>
+                            <td>${productsList}</td>
+                            <td>₹${sale.total_amount.toFixed(2)}</td>
+                            <td>
+                                <button class="btn btn-secondary view-sale" data-id="${sale.id}" data-sale="${encodeURIComponent(JSON.stringify(sale))}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem;">View Details</button>
+                            </td>
+                        `;
+                        
+                        salesList.appendChild(row);
+                    });
+                    
+                    // Update summary cards
+                    todaySales.textContent = `₹${todayTotal.toFixed(2)}`;
+                    weekSales.textContent = `₹${weekTotal.toFixed(2)}`;
+                    monthSales.textContent = `₹${monthTotal.toFixed(2)}`;
+                    
+                    // Add event listeners to view buttons
+                    document.querySelectorAll('.view-sale').forEach(button => {
+                        button.addEventListener('click', function() {
+                            const saleData = JSON.parse(decodeURIComponent(this.getAttribute('data-sale')));
+                            showSaleDetails(saleData);
+                        });
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading sales:', error);
+                    salesList.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 1rem;">Error loading sales data. Please try refreshing the page.</td></tr>`;
+                    alert('An error occurred while loading sales');
+                });
+        }
+
+        // Show Sale Details
+        function showSaleDetails(sale) {
+            const saleDetailsContent = `
+                <div class="sale-detail-section">
+                    <h4>Customer Information</h4>
+                    <div class="detail-row">
+                        <span class="detail-label">Customer Name:</span>
+                        <span class="detail-value">${sale.customer_name}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">GST ID:</span>
+                        <span class="detail-value">${sale.customer_gst_id}</span>
+                    </div>
+                </div>
+                
+                <div class="sale-detail-section">
+                    <h4>Sale Information</h4>
+                    <div class="detail-row">
+                        <span class="detail-label">Sale Date:</span>
+                        <span class="detail-value">${new Date(sale.sale_date).toLocaleString()}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Delivery Charges:</span>
+                        <span class="detail-value">₹${sale.delivery_charges.toFixed(2)}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Total Amount:</span>
+                        <span class="detail-value">₹${sale.total_amount.toFixed(2)}</span>
+                    </div>
+                </div>
+                
+                <div class="sale-detail-section">
+                    <h4>Products</h4>
+                    <table style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>Product ID</th>
+                                <th>Product Name</th>
+                                <th>Quantity</th>
+                                <th>Unit Price</th>
+                                <th>GST %</th>
+                                <th>Discount %</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${sale.items.map(item => `
+                                <tr>
+                                    <td>${item.product_id}</td>
+                                    <td>${item.product_name}</td>
+                                    <td>${item.quantity}</td>
+                                    <td>₹${item.unit_price.toFixed(2)}</td>
+                                    <td>${item.gst_percentage}%</td>
+                                    <td>${item.discount_percentage}%</td>
+                                    <td>₹${item.total_price.toFixed(2)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            document.getElementById('sale-details-content').innerHTML = saleDetailsContent;
+            viewSaleModal.style.display = 'block';
+        }
+
+        // Delivery charges change
+        deliveryCharges.addEventListener('input', calculateOrderTotal);
+
+        // Close modal when clicking outside
+        window.addEventListener('click', function(event) {
+            if (event.target === addSaleModal) {
+                addSaleModal.style.display = 'none';
+            }
+            if (event.target === addCustomerModal) {
+                addCustomerModal.style.display = 'none';
+            }
+            if (event.target === viewSaleModal) {
+                viewSaleModal.style.display = 'none';
+            }
+        });
+    });
+</script>
+{% endblock %}
+
