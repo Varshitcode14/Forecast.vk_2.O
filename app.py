@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session, abort
 from flask_sqlalchemy import SQLAlchemy
 from models import db, User, Customer, Product, Sale, SaleItem, Vendor, Purchase, PurchaseItem, Report
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
@@ -8,6 +8,7 @@ from decimal import Decimal
 from datetime import datetime, timedelta
 import pytz
 from import_routes import import_bp
+from functools import wraps
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
@@ -34,6 +35,51 @@ def get_current_time_ist():
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+# Function to create admin user
+def create_admin_user():
+    # Check if admin user exists
+    admin_email = "forecastai007@gmail.com"
+    admin = User.query.filter_by(email=admin_email).first()
+    
+    if not admin:
+        # Create admin user
+        admin = User(
+            name="admin_Varshit_k",
+            email=admin_email,
+            is_admin=True
+        )
+        admin.set_password("Forecast@007")
+        db.session.add(admin)
+        db.session.commit()
+        print("Admin user created successfully")
+    elif not admin.is_admin:
+        # Update existing user to be admin
+        admin.is_admin = True
+        db.session.commit()
+        print("User updated to admin status")
+
+# Add this decorator function to check if user is admin
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_admin:
+            flash('You do not have permission to access this page', 'error')
+            return redirect(url_for('home'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Add this decorator function to check if user is NOT an admin
+def regular_user_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return redirect(url_for('login'))
+        if current_user.is_admin:
+            flash('Admin users should use the admin dashboard', 'error')
+            return redirect(url_for('admin_dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Authentication routes
 @app.route('/')
@@ -85,8 +131,14 @@ def login():
         
         if user and user.check_password(password):
             login_user(user)
-            flash('Logged in successfully!', 'success')
-            return redirect(url_for('home'))
+            
+            # Redirect admin users to admin dashboard
+            if user.is_admin:
+                flash('Admin logged in successfully!', 'success')
+                return redirect(url_for('admin_dashboard'))
+            else:
+                flash('Logged in successfully!', 'success')
+                return redirect(url_for('home'))
         else:
             flash('Invalid email or password', 'error')
             
@@ -101,6 +153,7 @@ def logout():
 
 @app.route('/home')
 @login_required
+@regular_user_required
 def home():
     return render_template('index.html')
 
@@ -161,57 +214,67 @@ def generate_daily_report():
 
 @app.route('/insights')
 @login_required
+@regular_user_required
 def insights():
     return render_template('insights.html')
 
 @app.route('/forecast_reports')
 @login_required
+@regular_user_required
 def forecast_reports():
     return render_template('forecast_reports.html')
 
 @app.route('/stock')
 @login_required
+@regular_user_required
 def stock():
     products = Product.query.all()
     return render_template('stock.html', products=products)
 
 @app.route('/sales')
 @login_required
+@regular_user_required
 def sales():
     sales = Sale.query.order_by(Sale.sale_date.desc()).all()
     return render_template('sales.html', sales=sales)
 
 @app.route('/purchases')
 @login_required
+@regular_user_required
 def purchases():
     purchases = Purchase.query.order_by(Purchase.purchase_date.desc()).all()
     return render_template('purchases.html', purchases=purchases)
 
 @app.route('/customers')
 @login_required
+@regular_user_required
 def customers():
     customers = Customer.query.all()
     return render_template('customers.html', customers=customers)
 
 @app.route('/vendors')
 @login_required
+@regular_user_required
 def vendors():
     vendors = Vendor.query.all()
     return render_template('vendors.html', vendors=vendors)
 
 @app.route('/notifications')
 @login_required
+@regular_user_required
 def notifications():
     return render_template('notifications.html')
 
 @app.route('/report')
 @login_required
+@regular_user_required
 def report():
     return render_template('report.html')
 
 # Import data route
 @app.route('/import_data')
 @login_required
+@regular_user_required
 def import_data():
     return redirect(url_for('import_bp.import_data'))
 
@@ -686,6 +749,7 @@ def get_report(id):
 # Create tables when the app starts
 with app.app_context():
     db.create_all()
+    create_admin_user()  # Create admin user if it doesn't exist
 
 # Setup scheduler for daily reports
 try:
@@ -701,6 +765,20 @@ try:
 
 except ImportError:
     print("APScheduler not installed. Daily reports will not be generated automatically.")
+
+# Admin routes
+@app.route('/admin')
+@login_required
+@admin_required
+def admin_dashboard():
+    return render_template('admin.html')
+
+@app.route('/api/admin/users')
+@login_required
+@admin_required
+def get_admin_users():
+    users = User.query.all()
+    return jsonify([user.to_dict() for user in users])
 
 if __name__ == '__main__':
     app.run(debug=True)
