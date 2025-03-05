@@ -11,6 +11,7 @@ class User(db.Model, UserMixin):
     email = db.Column(db.String(100), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_admin = db.Column(db.Boolean, default=False)  # Add this line
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -23,7 +24,8 @@ class User(db.Model, UserMixin):
             'id': self.id,
             'name': self.name,
             'email': self.email,
-            'created_at': self.created_at.isoformat()
+            'created_at': self.created_at.isoformat(),
+            'is_admin': self.is_admin
         }
 
 class Customer(db.Model):
