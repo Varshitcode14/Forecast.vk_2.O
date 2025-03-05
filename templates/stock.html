@@ -1,12 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}Stock - KKK Enterprises{% endblock %}
+{% block title %}Stock - Forecast.vk{% endblock %}
 
 {% block content %}
 <section class="page-header">
   <h2>Stock Management</h2>
   <p>Keep track of your inventory and stock levels.</p>
 </section>
+
+<div class="search-container">
+    <input type="text" id="product-search" placeholder="Search products..." class="search-input">
+    <button id="search-btn" class="btn btn-secondary">Search</button>
+    <button id="reset-search-btn" class="btn btn-secondary">Reset</button>
+</div>
 
 <div class="row" style="margin-bottom: 2rem;">
   <div class="summary-card">
@@ -32,23 +38,32 @@
       <button id="add-product-btn" class="btn btn-secondary">Add New Product</button>
   </div>
   <div class="table-container">
-      <table id="products-table">
-          <thead>
-              <tr>
-                  <th>Product ID</th>
-                  <th>Name</th>
-                  <th>Quantity</th>
-                  <th>Cost per Unit</th>
-                  <th>Specifications</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-              </tr>
-          </thead>
-          <tbody id="products-list">
-              <!-- Products will be loaded here dynamically -->
-          </tbody>
-      </table>
-  </div>
+    <div id="loading-indicator" class="loading-container">
+        <div class="loading-dots">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>
+        <p>Loading data...</p>
+    </div>
+    <table id="products-table">
+        <thead>
+            <tr>
+                <th>Product ID</th>
+                <th>Name</th>
+                <th>Quantity</th>
+                <th>Cost per Unit</th>
+                <th>Specifications</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="products-list">
+            <!-- Products will be loaded here dynamically -->
+        </tbody>
+    </table>
+</div>
 </div>
 
 <!-- Add Product Modal -->
@@ -252,6 +267,77 @@
   .btn-danger:hover {
       background-color: #d32f2f;
   }
+
+  .search-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.search-input {
+    flex: 1;
+    padding: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--secondary-color);
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(240, 248, 255, 0.2);
+}
+
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    text-align: center;
+}
+
+.loading-dots {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.dot {
+    width: 12px;
+    height: 12px;
+    margin: 0 5px;
+    background-color: var(--accent-color);
+    border-radius: 50%;
+    display: inline-block;
+    animation: dot-wave 1.5s infinite ease-in-out;
+}
+
+.dot:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.dot:nth-child(2) {
+    animation-delay: 0.3s;
+}
+
+.dot:nth-child(3) {
+    animation-delay: 0.6s;
+}
+
+.dot:nth-child(4) {
+    animation-delay: 0.9s;
+}
+
+@keyframes dot-wave {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-15px);
+    }
+}
 </style>
 {% endblock %}
 
@@ -390,94 +476,167 @@
           });
       });
 
-      // Load Products
-      function loadProducts() {
+      // Search functionality
+      const productSearch = document.getElementById('product-search');
+      const searchBtn = document.getElementById('search-btn');
+      const resetSearchBtn = document.getElementById('reset-search-btn');
+
+      searchBtn.addEventListener('click', function() {
+          const searchTerm = productSearch.value.toLowerCase().trim();
+          if (searchTerm) {
+              filterProducts(searchTerm);
+          }
+      });
+
+      resetSearchBtn.addEventListener('click', function() {
+          productSearch.value = '';
+          loadProducts();
+      });
+
+      productSearch.addEventListener('keyup', function(e) {
+          if (e.key === 'Enter') {
+              const searchTerm = productSearch.value.toLowerCase().trim();
+              if (searchTerm) {
+                  filterProducts(searchTerm);
+              }
+          }
+      });
+
+      function filterProducts(searchTerm) {
+          // Show loading indicator
+          document.getElementById('loading-indicator').style.display = 'flex';
+          document.getElementById('products-table').style.display = 'none';
+          
           fetch('/api/products')
               .then(response => response.json())
               .then(products => {
-                  productsList.innerHTML = '';
+                  const filteredProducts = products.filter(product => 
+                      product.product_id.toLowerCase().includes(searchTerm) || 
+                      product.name.toLowerCase().includes(searchTerm) ||
+                      (product.specifications && product.specifications.toLowerCase().includes(searchTerm))
+                  );
                   
-                  let totalProducts = products.length;
-                  let lowStock = 0;
-                  let outOfStock = 0;
+                  renderProducts(filteredProducts);
                   
-                  products.forEach(product => {
-                      const row = document.createElement('tr');
-                      
-                      // Determine status
-                      let status = '';
-                      let statusClass = '';
-                      
-                      if (product.quantity <= 0) {
-                          status = 'Out of Stock';
-                          statusClass = 'danger';
-                          outOfStock++;
-                      } else if (product.quantity <= 10) {
-                          status = 'Low Stock';
-                          statusClass = 'warning';
-                          lowStock++;
-                      } else {
-                          status = 'In Stock';
-                          statusClass = 'success';
-                      }
-                      
-                      // Truncate specifications for display
-                      const specDisplay = product.specifications ? 
-                          (product.specifications.length > 30 ? 
-                              product.specifications.substring(0, 30) + '...' : 
-                              product.specifications) : 
-                          '';
-                      
-                      row.innerHTML = `
-                          <td>${product.product_id}</td>
-                          <td>${product.name}</td>
-                          <td>${product.quantity}</td>
-                          <td>₹${product.cost_per_unit.toFixed(2)}</td>
-                          <td title="${product.specifications || ''}">${specDisplay}</td>
-                          <td><span style="color: ${statusClass === 'success' ? '#4caf50' : statusClass === 'warning' ? '#ff9800' : '#f44336'}; 
-                              background: ${statusClass === 'success' ? 'rgba(76, 175, 80, 0.1)' : statusClass === 'warning' ? 'rgba(255, 152, 0, 0.1)' : 'rgba(244, 67, 54, 0.1)'};
-                              padding: 0.3rem 0.6rem; border-radius: 4px;">${status}</span></td>
-                          <td>
-                              <button class="btn btn-secondary edit-product" data-id="${product.id}" data-product="${encodeURIComponent(JSON.stringify(product))}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem; margin-right: 0.5rem;">Edit</button>
-                              <button class="btn btn-danger delete-product" data-id="${product.id}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem;">Delete</button>
-                          </td>
-                      `;
-                      
-                      productsList.appendChild(row);
-                  });
+                  // Hide loading indicator
+                  document.getElementById('loading-indicator').style.display = 'none';
+                  document.getElementById('products-table').style.display = 'table';
+              })
+              .catch(error => {
+                  console.error('Error:', error);
+                  alert('An error occurred while searching products');
                   
-                  // Update summary cards
-                  totalProductsEl.textContent = totalProducts;
-                  lowStockEl.textContent = lowStock;
-                  outOfStockEl.textContent = outOfStock;
+                  // Hide loading indicator even on error
+                  document.getElementById('loading-indicator').style.display = 'none';
+                  document.getElementById('products-table').style.display = 'table';
+              });
+      }
+
+      function renderProducts(products) {
+          productsList.innerHTML = '';
+          
+          let totalProducts = products.length;
+          let lowStock = 0;
+          let outOfStock = 0;
+          
+          products.forEach(product => {
+              // Same code as in loadProducts function for rendering each product
+              const row = document.createElement('tr');
+              
+              // Determine status
+              let status = '';
+              let statusClass = '';
+              
+              if (product.quantity <= 0) {
+                  status = 'Out of Stock';
+                  statusClass = 'danger';
+                  outOfStock++;
+              } else if (product.quantity <= 10) {
+                  status = 'Low Stock';
+                  statusClass = 'warning';
+                  lowStock++;
+              } else {
+                  status = 'In Stock';
+                  statusClass = 'success';
+              }
+              
+              // Truncate specifications for display
+              const specDisplay = product.specifications ? 
+                  (product.specifications.length > 30 ? 
+                      product.specifications.substring(0, 30) + '...' : 
+                      product.specifications) : 
+                  '';
+              
+              row.innerHTML = `
+                  <td>${product.product_id}</td>
+                  <td>${product.name}</td>
+                  <td>${product.quantity}</td>
+                  <td>₹${product.cost_per_unit.toFixed(2)}</td>
+                  <td title="${product.specifications || ''}">${specDisplay}</td>
+                  <td><span style="color: ${statusClass === 'success' ? '#4caf50' : statusClass === 'warning' ? '#ff9800' : '#f44336'}; 
+                      background: ${statusClass === 'success' ? 'rgba(76, 175, 80, 0.1)' : statusClass === 'warning' ? 'rgba(255, 152, 0, 0.1)' : 'rgba(244, 67, 54, 0.1)'};
+                      padding: 0.3rem 0.6rem; border-radius: 4px;">${status}</span></td>
+                  <td>
+                      <button class="btn btn-secondary edit-product" data-id="${product.id}" data-product="${encodeURIComponent(JSON.stringify(product))}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem; margin-right: 0.5rem;">Edit</button>
+                      <button class="btn btn-danger delete-product" data-id="${product.id}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem;">Delete</button>
+                  </td>
+              `;
+              
+              productsList.appendChild(row);
+          });
+          
+          // Update summary cards
+          totalProductsEl.textContent = totalProducts;
+          lowStockEl.textContent = lowStock;
+          outOfStockEl.textContent = outOfStock;
+          
+          // Add event listeners to edit and delete buttons
+          document.querySelectorAll('.edit-product').forEach(button => {
+              button.addEventListener('click', function() {
+                  const productData = JSON.parse(decodeURIComponent(this.getAttribute('data-product')));
                   
-                  // Add event listeners to edit and delete buttons
-                  document.querySelectorAll('.edit-product').forEach(button => {
-                      button.addEventListener('click', function() {
-                          const productData = JSON.parse(decodeURIComponent(this.getAttribute('data-product')));
-                          
-                          document.getElementById('edit-product-id').value = productData.id;
-                          document.getElementById('edit-product-code').value = productData.product_id;
-                          document.getElementById('edit-product-name').value = productData.name;
-                          document.getElementById('edit-product-quantity').value = productData.quantity;
-                          document.getElementById('edit-product-cost').value = productData.cost_per_unit;
-                          document.getElementById('edit-product-specifications').value = productData.specifications || '';
-                          
-                          editProductModal.style.display = 'block';
-                      });
-                  });
+                  document.getElementById('edit-product-id').value = productData.id;
+                  document.getElementById('edit-product-code').value = productData.product_id;
+                  document.getElementById('edit-product-name').value = productData.name;
+                  document.getElementById('edit-product-quantity').value = productData.quantity;
+                  document.getElementById('edit-product-cost').value = productData.cost_per_unit;
+                  document.getElementById('edit-product-specifications').value = productData.specifications || '';
                   
-                  document.querySelectorAll('.delete-product').forEach(button => {
-                      button.addEventListener('click', function() {
-                          const productId = this.getAttribute('data-id');
-                          document.getElementById('delete-product-id').value = productId;
-                          deleteConfirmModal.style.display = 'block';
-                      });
-                  });
+                  editProductModal.style.display = 'block';
+              });
+          });
+          
+          document.querySelectorAll('.delete-product').forEach(button => {
+              button.addEventListener('click', function() {
+                  const productId = this.getAttribute('data-id');
+                  document.getElementById('delete-product-id').value = productId;
+                  deleteConfirmModal.style.display = 'block';
+              });
+          });
+      }
+
+      // Load Products
+      function loadProducts() {
+          // Show loading indicator
+          document.getElementById('loading-indicator').style.display = 'flex';
+          document.getElementById('products-table').style.display = 'none';
+          
+          fetch('/api/products')
+              .then(response => response.json())
+              .then(products => {
+                  renderProducts(products);
+                  
+                  // Hide loading indicator
+                  document.getElementById('loading-indicator').style.display = 'none';
+                  document.getElementById('products-table').style.display = 'table';
               })
               .catch(error => {
                   console.error('Error:', error);
                   alert('An error occurred while loading products');
+                  
+                  // Hide loading indicator even on error
+                  document.getElementById('loading-indicator').style.display = 'none';
+                  document.getElementById('products-table').style.display = 'table';
               });
       }
 

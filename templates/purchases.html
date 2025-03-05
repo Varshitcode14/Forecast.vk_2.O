@@ -26,28 +26,42 @@
   </div>
 </div>
 
+<div class="search-container">
+    <input type="text" id="vendor-search" placeholder="Search by vendor name..." class="search-input">
+    <button id="search-btn" class="btn btn-secondary">Search</button>
+    <button id="reset-search-btn" class="btn btn-secondary">Reset</button>
+</div>
+
 <div class="card">
   <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
       <h3>Purchase Orders</h3>
       <button id="add-purchase-btn" class="btn btn-secondary">Add New Purchase</button>
   </div>
   <div class="table-container">
-      <table id="purchases-table">
-          <thead>
-              <tr>
-                  <th>Order ID</th>
-                  <th>Vendor</th>
-                  <th>Date</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-              </tr>
-          </thead>
-          <tbody id="purchases-list">
-              <!-- Purchases will be loaded here dynamically -->
-          </tbody>
-      </table>
-  </div>
+    <div id="loading-indicator" class="loading-container">
+        <div class="loading-dots">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>
+        <p>Loading data...</p>
+    </div>
+    <table id="purchases-table">
+        <thead>
+            <tr>
+                <th>Order ID</th>
+                <th>Vendor</th>
+                <th>Date</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="purchases-list">
+            <!-- Purchases will be loaded here dynamically -->
+        </tbody>
+    </table>
 </div>
 
 <!-- Add Vendor Modal -->
@@ -277,6 +291,24 @@
   </div>
 </div>
 
+<!-- Delete Purchase Confirmation Modal -->
+<div id="delete-purchase-modal" class="modal">
+<div class="modal-content">
+    <div class="modal-header">
+        <h3>Confirm Delete</h3>
+        <span class="close">&times;</span>
+    </div>
+    <div class="modal-body">
+        <p>Are you sure you want to delete this purchase? This action cannot be undone.</p>
+        <input type="hidden" id="delete-purchase-id">
+        <div class="form-actions">
+            <button type="button" class="btn btn-secondary" id="cancel-delete-purchase">Cancel</button>
+            <button type="button" class="btn btn-danger" id="confirm-delete-purchase">Delete</button>
+        </div>
+    </div>
+</div>
+</div>
+
 {% endblock %}
 
 {% block extra_css %}
@@ -472,6 +504,77 @@
       background-color: rgba(244, 67, 54, 0.2);
       border-color: rgba(244, 67, 54, 0.3);
   }
+
+.search-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.search-input {
+    flex: 1;
+    padding: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--secondary-color);
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(240, 248, 255, 0.2);
+}
+
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    text-align: center;
+}
+
+.loading-dots {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.dot {
+    width: 12px;
+    height: 12px;
+    margin: 0 5px;
+    background-color: var(--accent-color);
+    border-radius: 50%;
+    display: inline-block;
+    animation: dot-wave 1.5s infinite ease-in-out;
+}
+
+.dot:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.dot:nth-child(2) {
+    animation-delay: 0.3s;
+}
+
+.dot:nth-child(3) {
+    animation-delay: 0.6s;
+}
+
+.dot:nth-child(4) {
+    animation-delay: 0.9s;
+}
+
+@keyframes dot-wave {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-15px);
+    }
+}
 </style>
 {% endblock %}
 
@@ -501,6 +604,10 @@
       const monthPurchases = document.getElementById('month-purchases');
       const pendingOrders = document.getElementById('pending-orders');
       const totalVendors = document.getElementById('total-vendors');
+      const deletePurchaseModal = document.getElementById('delete-purchase-modal');
+      const vendorSearch = document.getElementById('vendor-search');
+      const searchBtn = document.getElementById('search-btn');
+      const resetSearchBtn = document.getElementById('reset-search-btn');
 
       // Global variables
       let vendors = [];
@@ -517,6 +624,7 @@
               addPurchaseModal.style.display = 'none';
               viewPurchaseModal.style.display = 'none';
               updateStatusModal.style.display = 'none';
+              deletePurchaseModal.style.display = 'none';
           });
       });
 
@@ -539,6 +647,10 @@
 
       document.getElementById('cancel-update-status').addEventListener('click', function() {
           updateStatusModal.style.display = 'none';
+      });
+
+      document.getElementById('cancel-delete-purchase').addEventListener('click', function() {
+          deletePurchaseModal.style.display = 'none';
       });
 
       // Show Add Purchase Modal
@@ -976,92 +1088,26 @@
 
       // Load Purchases
       function loadPurchases() {
+          // Show loading indicator
+          document.getElementById('loading-indicator').style.display = 'flex';
+          document.getElementById('purchases-table').style.display = 'none';
+          
           fetch('/api/purchases')
               .then(response => response.json())
               .then(purchases => {
-                  purchasesList.innerHTML = '';
+                  renderPurchases(purchases);
                   
-                  let monthTotal = 0;
-                  let pendingCount = 0;
-                  
-                  const today = new Date();
-                  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-                  
-                  purchases.forEach(purchase => {
-                      const row = document.createElement('tr');
-                      
-                      const purchaseDate = new Date(purchase.purchase_date);
-                      
-                      // Calculate summary totals
-                      if (purchaseDate >= monthStart) {
-                          monthTotal += purchase.total_amount;
-                      }
-                      
-                      if (purchase.status === 'Ordered' || purchase.status === 'In Transit') {
-                          pendingCount++;
-                      }
-                      
-                      // Determine status class
-                      let statusClass = '';
-                      switch (purchase.status) {
-                          case 'Delivered':
-                              statusClass = 'success';
-                              break;
-                          case 'In Transit':
-                              statusClass = 'warning';
-                              break;
-                          case 'Ordered':
-                              statusClass = 'info';
-                              break;
-                          case 'Cancelled':
-                              statusClass = 'danger';
-                              break;
-                      }
-                      
-                      row.innerHTML = `
-                          <td>${purchase.order_id}</td>
-                          <td>${purchase.vendor_name}</td>
-                          <td>${new Date(purchase.purchase_date).toLocaleDateString()}</td>
-                          <td>₹${purchase.total_amount.toFixed(2)}</td>
-                          <td><span style="color: ${statusClass === 'success' ? '#4caf50' : statusClass === 'warning' ? '#ff9800' : statusClass === 'danger' ? '#f44336' : '#2196f3'}; 
-                              background: ${statusClass === 'success' ? 'rgba(76, 175, 80, 0.1)' : statusClass === 'warning' ? 'rgba(255, 152, 0, 0.1)' : statusClass === 'danger' ? 'rgba(244, 67, 54, 0.1)' : 'rgba(33, 150, 243, 0.1)'};
-                              padding: 0.3rem 0.6rem; border-radius: 4px;">${purchase.status}</span></td>
-                          <td>
-                              <button class="btn btn-secondary view-purchase" data-id="${purchase.id}" data-purchase="${encodeURIComponent(JSON.stringify(purchase))}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem; margin-right: 0.5rem;">View</button>
-                              <button class="btn btn-secondary update-status" data-id="${purchase.id}" data-status="${purchase.status}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem;">Update Status</button>
-                          </td>
-                      `;
-                      
-                      purchasesList.appendChild(row);
-                  });
-                  
-                  // Update summary cards
-                  monthPurchases.textContent = `₹${monthTotal.toFixed(2)}`;
-                  pendingOrders.textContent = pendingCount;
-                  
-                  // Add event listeners to view and update status buttons
-                  document.querySelectorAll('.view-purchase').forEach(button => {
-                      button.addEventListener('click', function() {
-                          const purchaseData = JSON.parse(decodeURIComponent(this.getAttribute('data-purchase')));
-                          showPurchaseDetails(purchaseData);
-                      });
-                  });
-                  
-                  document.querySelectorAll('.update-status').forEach(button => {
-                      button.addEventListener('click', function() {
-                          const purchaseId = this.getAttribute('data-id');
-                          const currentStatus = this.getAttribute('data-status');
-                          
-                          document.getElementById('update-purchase-id').value = purchaseId;
-                          document.getElementById('update-purchase-status').value = currentStatus;
-                          
-                          updateStatusModal.style.display = 'block';
-                      });
-                  });
+                  // Hide loading indicator
+                  document.getElementById('loading-indicator').style.display = 'none';
+                  document.getElementById('purchases-table').style.display = 'table';
               })
               .catch(error => {
                   console.error('Error:', error);
                   alert('An error occurred while loading purchases');
+                  
+                  // Hide loading indicator even on error
+                  document.getElementById('loading-indicator').style.display = 'none';
+                  document.getElementById('purchases-table').style.display = 'table';
               });
       }
 
@@ -1167,7 +1213,175 @@
           if (event.target === updateStatusModal) {
               updateStatusModal.style.display = 'none';
           }
+          if (event.target === deletePurchaseModal) {
+              deletePurchaseModal.style.display = 'none';
+          }
       });
+
+// Add search functionality
+searchBtn.addEventListener('click', function() {
+    const searchTerm = vendorSearch.value.toLowerCase().trim();
+    if (searchTerm) {
+        filterPurchases(searchTerm);
+    }
+});
+
+resetSearchBtn.addEventListener('click', function() {
+    vendorSearch.value = '';
+    loadPurchases();
+});
+
+vendorSearch.addEventListener('keyup', function(e) {
+    if (e.key === 'Enter') {
+        const searchTerm = vendorSearch.value.toLowerCase().trim();
+        if (searchTerm) {
+            filterPurchases(searchTerm);
+        }
+    }
+});
+
+function filterPurchases(searchTerm) {
+    // Show loading indicator
+    document.getElementById('loading-indicator').style.display = 'flex';
+    document.getElementById('purchases-table').style.display = 'none';
+    
+    fetch('/api/purchases')
+        .then(response => response.json())
+        .then(purchases => {
+            const filteredPurchases = purchases.filter(purchase => 
+                purchase.vendor_name.toLowerCase().includes(searchTerm) || 
+                purchase.order_id.toLowerCase().includes(searchTerm)
+            );
+            
+            renderPurchases(filteredPurchases);
+            
+            // Hide loading indicator
+            document.getElementById('loading-indicator').style.display = 'none';
+            document.getElementById('purchases-table').style.display = 'table';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while searching purchases');
+            
+            // Hide loading indicator even on error
+            document.getElementById('loading-indicator').style.display = 'none';
+            document.getElementById('purchases-table').style.display = 'table';
+        });
+}
+
+// Add renderPurchases function
+function renderPurchases(purchases) {
+    purchasesList.innerHTML = '';
+    
+    let monthTotal = 0;
+    let pendingCount = 0;
+    
+    const today = new Date();
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    
+    purchases.forEach(purchase => {
+        const row = document.createElement('tr');
+        
+        const purchaseDate = new Date(purchase.purchase_date);
+        
+        // Calculate summary totals
+        if (purchaseDate >= monthStart) {
+            monthTotal += purchase.total_amount;
+        }
+        
+        if (purchase.status === 'Ordered' || purchase.status === 'In Transit') {
+            pendingCount++;
+        }
+        
+        // Determine status class
+        let statusClass = '';
+        switch (purchase.status) {
+            case 'Delivered':
+                statusClass = 'success';
+                break;
+            case 'In Transit':
+                statusClass = 'warning';
+                break;
+            case 'Ordered':
+                statusClass = 'info';
+                break;
+            case 'Cancelled':
+                statusClass = 'danger';
+                break;
+        }
+        
+        row.innerHTML = `
+            <td>${purchase.order_id}</td>
+            <td>${purchase.vendor_name}</td>
+            <td>${new Date(purchase.purchase_date).toLocaleDateString()}</td>
+            <td>₹${purchase.total_amount.toFixed(2)}</td>
+            <td><span style="color: ${statusClass === 'success' ? '#4caf50' : statusClass === 'warning' ? '#ff9800' : statusClass === 'danger' ? '#f44336' : '#2196f3'}; 
+                background: ${statusClass === 'success' ? 'rgba(76, 175, 80, 0.1)' : statusClass === 'warning' ? 'rgba(255, 152, 0, 0.1)' : statusClass === 'danger' ? 'rgba(244, 67, 54, 0.1)' : 'rgba(33, 150, 243, 0.1)'};
+                padding: 0.3rem 0.6rem; border-radius: 4px;">${purchase.status}</span></td>
+            <td>
+                <button class="btn btn-secondary view-purchase" data-id="${purchase.id}" data-purchase="${encodeURIComponent(JSON.stringify(purchase))}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem; margin-right: 0.5rem;">View</button>
+                <button class="btn btn-secondary update-status" data-id="${purchase.id}" data-status="${purchase.status}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem; margin-right: 0.5rem;">Update Status</button>
+                <button class="btn btn-danger delete-purchase" data-id="${purchase.id}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem;">Delete</button>
+            </td>
+        `;
+        
+        purchasesList.appendChild(row);
+    });
+    
+    // Update summary cards
+    monthPurchases.textContent = `₹${monthTotal.toFixed(2)}`;
+    pendingOrders.textContent = pendingCount;
+    
+    // Add event listeners to view, update status, and delete buttons
+    document.querySelectorAll('.view-purchase').forEach(button => {
+        button.addEventListener('click', function() {
+            const purchaseData = JSON.parse(decodeURIComponent(this.getAttribute('data-purchase')));
+            showPurchaseDetails(purchaseData);
+        });
+    });
+    
+    document.querySelectorAll('.update-status').forEach(button => {
+        button.addEventListener('click', function() {
+            const purchaseId = this.getAttribute('data-id');
+            const currentStatus = this.getAttribute('data-status');
+            
+            document.getElementById('update-purchase-id').value = purchaseId;
+            document.getElementById('update-purchase-status').value = currentStatus;
+            
+            updateStatusModal.style.display = 'block';
+        });
+    });
+    
+    document.querySelectorAll('.delete-purchase').forEach(button => {
+        button.addEventListener('click', function() {
+            const purchaseId = this.getAttribute('data-id');
+            document.getElementById('delete-purchase-id').value = purchaseId;
+            deletePurchaseModal.style.display = 'block';
+        });
+    });
+}
+
+// Add delete purchase functionality
+document.getElementById('confirm-delete-purchase').addEventListener('click', function() {
+    const purchaseId = document.getElementById('delete-purchase-id').value;
+    
+    fetch(`/api/purchases/${purchaseId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            deletePurchaseModal.style.display = 'none';
+            loadPurchases();
+        } else {
+            alert(data.message || 'Error deleting purchase');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while deleting the purchase');
+    });
+});
   });
 </script>
 {% endblock %}

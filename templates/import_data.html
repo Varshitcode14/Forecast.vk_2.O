@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}Import Data - Forecast.vk{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <h2>Import Data</h2>
+  <p>Upload Excel files to import sales and purchase records</p>
+</section>
+
+<div class="import-options">
+  <div class="card">
+      <div class="card-header">
+          <h3>Select Import Type</h3>
+      </div>
+      <div class="card-body">
+          <div class="import-type-container">
+              <div class="import-type-card">
+                  <div class="import-icon">
+                      <i class="fas fa-shopping-cart"></i>
+                  </div>
+                  <h4>Import Sales Data</h4>
+                  <p>Import customer sales records from Excel files</p>
+                  <ul class="import-requirements">
+                      <li>Customer information</li>
+                      <li>Product details</li>
+                      <li>Sales quantities</li>
+                      <li>Total amounts (including tax)</li>
+                  </ul>
+                  <a href="{{ url_for('import_bp.import_sales') }}" class="btn">Import Sales</a>
+              </div>
+              
+              <div class="import-type-card">
+                  <div class="import-icon">
+                      <i class="fas fa-truck"></i>
+                  </div>
+                  <h4>Import Purchase Data</h4>
+                  <p>Import vendor purchase records from Excel files</p>
+                  <ul class="import-requirements">
+                      <li>Vendor information</li>
+                      <li>Product details</li>
+                      <li>Purchase quantities</li>
+                      <li>Total amounts (including tax)</li>
+                  </ul>
+                  <a href="{{ url_for('import_bp.import_purchases') }}" class="btn">Import Purchases</a>
+              </div>
+          </div>
+          
+          <div class="import-instructions">
+              <h4>File Format Instructions</h4>
+              <div class="instruction-section">
+                  <h5>Sales Import Format</h5>
+                  <p>Your Excel file should include the following columns:</p>
+                  <ul>
+                      <li><strong>Invoice Number</strong> - Unique identifier for the sale</li>
+                      <li><strong>Date</strong> - Date of the sale</li>
+                      <li><strong>Customer Name</strong> - Name of the customer</li>
+                      <li><strong>Product Name</strong> - Name of the product</li>
+                      <li><strong>Quantity</strong> - Number of units sold</li>
+                      <li><strong>Total Amount</strong> - Total amount including tax</li>
+                  </ul>
+                  <p class="note">Note: GST will be automatically calculated at 18%</p>
+              </div>
+              
+              <div class="instruction-section">
+                  <h5>Purchases Import Format</h5>
+                  <p>Your Excel file should include the following columns:</p>
+                  <ul>
+                      <li><strong>Order ID</strong> - Unique identifier for the purchase order</li>
+                      <li><strong>Date</strong> - Date of the purchase</li>
+                      <li><strong>Vendor Name</strong> - Name of the vendor</li>
+                      <li><strong>Product Name</strong> - Name of the product</li>
+                      <li><strong>Quantity</strong> - Number of units purchased</li>
+                      <li><strong>Total Amount</strong> - Total amount including tax</li>
+                  </ul>
+                  <p class="note">Note: GST will be automatically calculated at 18% and status will be set to "Delivered" by default</p>
+              </div>
+          </div>
+      </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.import-options {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.import-type-container {
+  display: flex;
+  justify-content: space-between;
+  gap: 30px;
+  margin-bottom: 40px;
+}
+
+.import-type-card {
+  flex: 1;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 30px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.import-type-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.import-icon {
+  font-size: 3rem;
+  margin-bottom: 20px;
+  color: var(--accent-color);
+}
+
+.import-type-card h4 {
+  font-size: 1.5rem;
+  margin-bottom: 15px;
+  color: var(--secondary-color);
+}
+
+.import-type-card p {
+  margin-bottom: 20px;
+  color: var(--text-color);
+}
+
+.import-requirements {
+  text-align: left;
+  margin-bottom: 25px;
+  padding-left: 20px;
+}
+
+.import-requirements li {
+  margin-bottom: 8px;
+  color: var(--text-color);
+}
+
+.import-instructions {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 25px;
+}
+
+.import-instructions h4 {
+  font-size: 1.3rem;
+  margin-bottom: 20px;
+  color: var(--secondary-color);
+  text-align: center;
+}
+
+.instruction-section {
+  margin-bottom: 25px;
+}
+
+.instruction-section h5 {
+  font-size: 1.1rem;
+  margin-bottom: 10px;
+  color: var(--accent-color);
+}
+
+.instruction-section p {
+  margin-bottom: 10px;
+}
+
+.instruction-section ul {
+  padding-left: 20px;
+}
+
+.instruction-section li {
+  margin-bottom: 8px;
+}
+
+.note {
+  font-style: italic;
+  margin-top: 10px;
+  color: var(--accent-color);
+}
+
+@media (max-width: 768px) {
+  .import-type-container {
+      flex-direction: column;
+  }
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+      // Add any JavaScript needed for the import page
+  });
+</script>
+{% endblock %}
+

@@ -1,0 +1,764 @@
+{% extends "base.html" %}
+
+{% block title %}Import Sales Data - Forecast.vk{% endblock %}
+
+{% block content %}
+<section class="page-header">
+<h2>Import Sales Data</h2>
+<p>Upload Excel files to import sales records</p>
+</section>
+
+<div class="import-workflow">
+<div class="workflow-step {% if step == 1 %}active{% endif %}" id="step1">
+  <div class="step-number">1</div>
+  <div class="step-title">Upload File</div>
+</div>
+<div class="workflow-connector"></div>
+<div class="workflow-step {% if step == 2 %}active{% endif %}" id="step2">
+  <div class="step-number">2</div>
+  <div class="step-title">Date Format</div>
+</div>
+<div class="workflow-connector"></div>
+<div class="workflow-step {% if step == 3 %}active{% endif %}" id="step3">
+  <div class="step-number">3</div>
+  <div class="step-title">Preview Data</div>
+</div>
+<div class="workflow-connector"></div>
+<div class="workflow-step {% if step == 4 %}active{% endif %}" id="step4">
+  <div class="step-number">4</div>
+  <div class="step-title">Import</div>
+</div>
+</div>
+
+<!-- Step 1: File Upload -->
+<div class="card" id="upload-section" {% if step != 1 %}style="display: none;"{% endif %}>
+<div class="card-header">
+  <h3>Upload Sales Excel File</h3>
+</div>
+<div class="card-body">
+  <div class="upload-container">
+    <form id="upload-form" action="{{ url_for('import_bp.validate_sales_file') }}" method="post" enctype="multipart/form-data">
+      <div class="file-drop-area" id="drop-area">
+        <input class="file-input" type="file" name="file" id="file-input" accept=".xlsx,.xls,.csv" required>
+        <div class="file-msg">
+          <i class="file-icon">📄</i>
+          <span class="file-prompt">Drag & drop your Excel file here or click to browse</span>
+          <span class="file-name"></span>
+        </div>
+      </div>
+      <div class="upload-requirements">
+        <h4>File Requirements:</h4>
+        <p>Your Excel file must include the following columns:</p>
+        <ul>
+          <li><strong>Invoice Number</strong> - Unique identifier for the sale</li>
+          <li><strong>Date</strong> - Date of the sale</li>
+          <li><strong>Customer Name</strong> - Name of the customer</li>
+          <li><strong>Product Name</strong> - Name of the product</li>
+          <li><strong>Quantity</strong> - Number of units sold</li>
+          <li><strong>Total Amount</strong> - Total amount including GST</li>
+        </ul>
+        <p class="note">Note: GST will be calculated at 18% automatically.</p>
+      </div>
+      <div class="form-actions">
+        <a href="{{ url_for('import_bp.import_data') }}" class="btn btn-secondary">Back</a>
+        <button type="submit" class="btn" id="upload-btn" disabled>Continue to Date Format</button>
+      </div>
+    </form>
+  </div>
+</div>
+</div>
+
+<!-- Step 2: Date Format Selection -->
+<div class="card" id="date-format-section" {% if step != 2 %}style="display: none;"{% endif %}>
+<div class="card-header">
+  <h3>Select Date Format</h3>
+</div>
+<div class="card-body">
+  <form id="date-format-form" action="{{ url_for('import_bp.preview_sales_data') }}" method="post">
+    <input type="hidden" name="file_path" id="file-path" value="{{ file_path|default('') }}">
+    
+    <div class="form-group">
+      <label for="date-format">Select the date format used in your Excel file:</label>
+      <select id="date-format" name="date_format" class="form-control" required>
+        <option value="">-- Select Date Format --</option>
+        <option value="DD/MM/YYYY">DD/MM/YYYY (e.g., 31/12/2023)</option>
+        <option value="MM/DD/YYYY">MM/DD/YYYY (e.g., 12/31/2023)</option>
+        <option value="YYYY-MM-DD">YYYY-MM-DD (e.g., 2023-12-31)</option>
+        <option value="DD-MM-YYYY">DD-MM-YYYY (e.g., 31-12-2023)</option>
+        <option value="MM-DD-YYYY">MM-DD-YYYY (e.g., 12-31-2023)</option>
+      </select>
+    </div>
+    
+    <div class="form-actions">
+      <button type="button" class="btn btn-secondary" onclick="goToStep(1)">Back</button>
+      <button type="submit" class="btn">Preview Data</button>
+    </div>
+  </form>
+</div>
+</div>
+
+<!-- Step 3: Data Preview -->
+<div class="card" id="preview-section" {% if step != 3 %}style="display: none;"{% endif %}>
+<div class="card-header">
+  <h3>Preview Sales Data</h3>
+</div>
+<div class="card-body">
+  {% if preview_data %}
+  <div class="preview-info">
+    <p>Please review the data below to ensure it has been processed correctly.</p>
+    <div class="preview-summary">
+      <div class="summary-item">
+        <div class="summary-label">Total Records:</div>
+        <div class="summary-value">{{ total_rows }}</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">Showing:</div>
+        <div class="summary-value">{{ preview_data|length }} records</div>
+      </div>
+    </div>
+    
+    {% if date_warnings %}
+    <div class="warning-message">
+      <strong>Warning:</strong> Some dates may not match the selected format. Please check the preview carefully.
+    </div>
+    {% endif %}
+    
+    {% if missing_products or missing_customers %}
+    <div class="warning-message">
+      <strong>Warning:</strong> Some products or customers in the import file do not exist in the system.
+      {% if missing_products %}
+      <div>Missing Products: {{ missing_products|join(', ') }}</div>
+      {% endif %}
+      {% if missing_customers %}
+      <div>Missing Customers: {{ missing_customers|join(', ') }}</div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  
+  <div class="table-container">
+    <table class="preview-table">
+      <thead>
+        <tr>
+          <th>Invoice Number</th>
+          <th>Date</th>
+          <th>Customer</th>
+          <th>Product</th>
+          <th>Quantity</th>
+          <th>Unit Price</th>
+          <th>GST Amount</th>
+          <th>Total Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in preview_data %}
+        <tr>
+          <td>{{ row.invoice_number }}</td>
+          <td>{{ row.date }}</td>
+          <td>{{ row.customer_name }}</td>
+          <td>{{ row.product_name }}</td>
+          <td>{{ row.quantity }}</td>
+          <td>₹{{ row.unit_price }}</td>
+          <td>₹{{ row.gst_amount }}</td>
+          <td>₹{{ row.total_amount }}</td>
+        </tr>
+        {% endfor %}
+        {% if total_rows > preview_data|length %}
+        <tr>
+          <td colspan="8" class="more-rows">... and {{ total_rows - preview_data|length }} more rows</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+  
+  <form id="import-form" action="{{ url_for('import_bp.process_sales_import') }}" method="post">
+    <input type="hidden" name="file_path" value="{{ file_path }}">
+    <input type="hidden" name="date_format" value="{{ date_format }}">
+    
+    {% if missing_products or missing_customers %}
+    <div class="form-group">
+      <label for="create-missing">
+        <input type="checkbox" id="create-missing" name="create_missing" value="yes">
+        Automatically create missing products and customers
+      </label>
+      <div class="help-text">If checked, missing products and customers will be created with placeholder data that you can update later.</div>
+    </div>
+    {% endif %}
+    
+    <div class="form-actions">
+      <button type="button" class="btn btn-secondary" onclick="goToStep(2)">Back</button>
+      <button type="submit" class="btn">Import Data</button>
+    </div>
+  </form>
+  {% else %}
+  <p>No preview data available. Please upload a file first.</p>
+  <div class="form-actions">
+    <button type="button" class="btn btn-secondary" onclick="goToStep(1)">Back to Upload</button>
+  </div>
+  {% endif %}
+</div>
+</div>
+
+<!-- Step 4: Import Results -->
+<div class="card" id="results-section" {% if step != 4 %}style="display: none;"{% endif %}>
+<div class="card-header">
+  <h3>Import Results</h3>
+</div>
+<div class="card-body">
+  {% if import_results %}
+  <div class="import-summary">
+    <div class="summary-item success">
+      <div class="summary-icon">✓</div>
+      <div class="summary-details">
+        <div class="summary-title">Successfully Imported</div>
+        <div class="summary-value">{{ import_results.success }}</div>
+      </div>
+    </div>
+    
+    <div class="summary-item warning">
+      <div class="summary-icon">⚠</div>
+      <div class="summary-details">
+        <div class="summary-title">Warnings</div>
+        <div class="summary-value">{{ import_results.warnings }}</div>
+      </div>
+    </div>
+    
+    <div class="summary-item error">
+      <div class="summary-icon">✗</div>
+      <div class="summary-details">
+        <div class="summary-title">Errors</div>
+        <div class="summary-value">{{ import_results.errors }}</div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="import-details">
+    {% if import_results.new_customers %}
+    <div class="detail-section">
+      <h4>New Customers</h4>
+      <div class="new-entities">
+        <p>The following customers were automatically created:</p>
+        <ul>
+          {% for customer in import_results.new_customers %}
+          <li>{{ customer }}</li>
+          {% endfor %}
+        </ul>
+        <div class="help-text">These customers were created with placeholder data. Please update their details in the Customers section.</div>
+      </div>
+    </div>
+    {% endif %}
+    
+    {% if import_results.new_products %}
+    <div class="detail-section">
+      <h4>New Products</h4>
+      <div class="new-entities">
+        <p>The following products were automatically created:</p>
+        <ul>
+          {% for product in import_results.new_products %}
+          <li>{{ product }}</li>
+          {% endfor %}
+        </ul>
+        <div class="help-text">These products were created with placeholder data. Please update their details in the Stock section.</div>
+      </div>
+    </div>
+    {% endif %}
+    
+    {% if import_results.errors_list %}
+    <div class="detail-section errors-list">
+      <h4>Error Details</h4>
+      <ul>
+        {% for error in import_results.errors_list %}
+        <li>{{ error }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+  
+  <div class="form-actions">
+    <a href="{{ url_for('sales') }}" class="btn btn-secondary">View Sales</a>
+    <a href="{{ url_for('import_bp.import_data') }}" class="btn">Import More Data</a>
+  </div>
+  {% else %}
+  <p>No import results available. Please complete the import process first.</p>
+  <div class="form-actions">
+    <a href="{{ url_for('import_bp.import_data') }}" class="btn">Back to Import</a>
+  </div>
+  {% endif %}
+</div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Import Workflow Styles */
+.import-workflow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+  padding: 0 1rem;
+}
+
+.workflow-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+.step-number {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+  transition: all 0.3s ease;
+}
+
+.workflow-step.active .step-number {
+  background-color: var(--accent-color);
+  color: var(--primary-dark);
+}
+
+.step-title {
+  font-size: 0.9rem;
+  color: var(--text-color);
+  transition: all 0.3s ease;
+}
+
+.workflow-step.active .step-title {
+  color: var(--secondary-color);
+  font-weight: 500;
+}
+
+.workflow-connector {
+  flex: 1;
+  height: 2px;
+  background-color: rgba(255, 255, 255, 0.1);
+  margin: 0 10px;
+  position: relative;
+  top: -10px;
+}
+
+/* File Upload Styles */
+.upload-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem;
+}
+
+.file-drop-area {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+  padding: 2rem;
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  text-align: center;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  margin-bottom: 2rem;
+}
+
+.file-drop-area:hover, .file-drop-area.dragover {
+  border-color: var(--accent-color);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.file-input {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.file-msg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--text-color);
+}
+
+.file-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.file-prompt {
+  margin-bottom: 0.5rem;
+}
+
+.file-name {
+  font-weight: 500;
+  color: var(--secondary-color);
+  word-break: break-all;
+}
+
+.upload-requirements {
+  width: 100%;
+  max-width: 600px;
+  margin-bottom: 1.5rem;
+}
+
+.upload-requirements h4 {
+  color: var(--secondary-color);
+  margin-bottom: 0.8rem;
+}
+
+.upload-requirements ul {
+  padding-left: 1.5rem;
+}
+
+.upload-requirements li {
+  margin-bottom: 0.5rem;
+  color: var(--text-color);
+}
+
+.note {
+  font-style: italic;
+  color: var(--accent-color);
+  margin-top: 1rem;
+}
+
+/* Preview Styles */
+.preview-info {
+  margin-bottom: 1.5rem;
+}
+
+.preview-summary {
+  display: flex;
+  gap: 2rem;
+  margin: 1rem 0;
+}
+
+.summary-item {
+  display: flex;
+  align-items: center;
+}
+
+.summary-label {
+  font-weight: 500;
+  margin-right: 0.5rem;
+}
+
+.summary-value {
+  color: var(--secondary-color);
+}
+
+.warning-message {
+  background-color: rgba(255, 193, 7, 0.1);
+  border-left: 4px solid #ffc107;
+  padding: 1rem;
+  margin: 1rem 0;
+  border-radius: 4px;
+}
+
+.table-container {
+  overflow-x: auto;
+  margin-bottom: 1.5rem;
+}
+
+.preview-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.preview-table th, .preview-table td {
+  padding: 0.8rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.preview-table th {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--secondary-color);
+  font-weight: 500;
+}
+
+.more-rows {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.help-text {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 0.5rem;
+}
+
+/* Import Results Styles */
+.import-summary {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+
+.import-summary .summary-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin: 0 0.5rem;
+}
+
+.summary-item.success {
+  background-color: rgba(40, 167, 69, 0.1);
+  border-left: 4px solid #28a745;
+}
+
+.summary-item.warning {
+  background-color: rgba(255, 193, 7, 0.1);
+  border-left: 4px solid #ffc107;
+}
+
+.summary-item.error {
+  background-color: rgba(220, 53, 69, 0.1);
+  border-left: 4px solid #dc3545;
+}
+
+.summary-icon {
+  font-size: 1.8rem;
+  margin-right: 1rem;
+}
+
+.summary-item.success .summary-icon {
+  color: #28a745;
+}
+
+.summary-item.warning .summary-icon {
+  color: #ffc107;
+}
+
+.summary-item.error .summary-icon {
+  color: #dc3545;
+}
+
+.summary-title {
+  font-size: 0.9rem;
+  color: var(--text-color);
+  margin-bottom: 0.3rem;
+}
+
+.summary-value {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--secondary-color);
+}
+
+.import-details {
+  margin-bottom: 2rem;
+}
+
+.detail-section {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.detail-section:last-child {
+  border-bottom: none;
+}
+
+.detail-section h4 {
+  color: var(--secondary-color);
+  margin-bottom: 0.8rem;
+}
+
+.new-entities {
+  background-color: rgba(255, 255, 255, 0.05);
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.new-entities ul {
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.new-entities li {
+  margin-bottom: 0.3rem;
+}
+
+.errors-list {
+  background-color: rgba(220, 53, 69, 0.1);
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.errors-list ul {
+  padding-left: 1.5rem;
+  margin: 0;
+}
+
+.errors-list li {
+  margin-bottom: 0.5rem;
+  color: #dc3545;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+  .import-workflow {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+  }
+  
+  .workflow-step {
+    flex-direction: row;
+    width: 100%;
+    margin-bottom: 1rem;
+  }
+  
+  .step-number {
+    margin-bottom: 0;
+    margin-right: 1rem;
+  }
+  
+  .workflow-connector {
+    display: none;
+  }
+  
+  .import-summary {
+    flex-direction: column;
+  }
+  
+  .import-summary .summary-item {
+    margin: 0 0 1rem 0;
+  }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // File upload handling
+  const dropArea = document.getElementById('drop-area');
+  const fileInput = document.getElementById('file-input');
+  const filePrompt = document.querySelector('.file-prompt');
+  const fileName = document.querySelector('.file-name');
+  const uploadBtn = document.getElementById('upload-btn');
+  
+  if (dropArea) {
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, preventDefaults, false);
+      document.body.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    // Highlight drop area when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropArea.addEventListener(eventName, highlight, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, unhighlight, false);
+    });
+    
+    // Handle dropped files
+    dropArea.addEventListener('drop', handleDrop, false);
+    
+    // Handle selected files
+    fileInput.addEventListener('change', handleFiles, false);
+  }
+  
+  function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  
+  function highlight() {
+    dropArea.classList.add('dragover');
+  }
+  
+  function unhighlight() {
+    dropArea.classList.remove('dragover');
+  }
+  
+  function handleDrop(e) {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    
+    if (files.length) {
+      fileInput.files = files;
+      handleFiles();
+    }
+  }
+  
+  function handleFiles() {
+    if (fileInput.files.length) {
+      const file = fileInput.files[0];
+      displayFileName(file);
+      validateFileType(file);
+    }
+  }
+  
+  function displayFileName(file) {
+    filePrompt.style.display = 'none';
+    fileName.textContent = file.name;
+    fileName.style.display = 'block';
+  }
+  
+  function validateFileType(file) {
+    const validExtensions = ['.xlsx', '.xls', '.csv'];
+    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+    
+    if (validExtensions.includes(fileExtension)) {
+      uploadBtn.disabled = false;
+    } else {
+      alert('Please select a valid Excel (.xlsx, .xls) or CSV file.');
+      fileInput.value = '';
+      filePrompt.style.display = 'block';
+      fileName.style.display = 'none';
+      uploadBtn.disabled = true;
+    }
+  }
+});
+
+// Function to navigate between steps
+function goToStep(step) {
+  // Hide all sections
+  document.getElementById('upload-section').style.display = 'none';
+  document.getElementById('date-format-section').style.display = 'none';
+  document.getElementById('preview-section').style.display = 'none';
+  document.getElementById('results-section').style.display = 'none';
+  
+  // Remove active class from all steps
+  document.querySelectorAll('.workflow-step').forEach(s => s.classList.remove('active'));
+  
+  // Show selected section and mark step as active
+  if (step === 1) {
+    document.getElementById('upload-section').style.display = 'block';
+    document.getElementById('step1').classList.add('active');
+  } else if (step === 2) {
+    document.getElementById('date-format-section').style.display = 'block';
+    document.getElementById('step2').classList.add('active');
+  } else if (step === 3) {
+    document.getElementById('preview-section').style.display = 'block';
+    document.getElementById('step3').classList.add('active');
+  } else if (step === 4) {
+    document.getElementById('results-section').style.display = 'block';
+    document.getElementById('step4').classList.add('active');
+  }
+}
+</script>
+{% endblock %}
+

@@ -26,6 +26,12 @@
     </div>
 </div>
 
+<div class="search-container">
+    <input type="text" id="customer-search" placeholder="Search by customer name..." class="search-input">
+    <button id="search-btn" class="btn btn-secondary">Search</button>
+    <button id="reset-search-btn" class="btn btn-secondary">Reset</button>
+</div>
+
 <div class="card">
     <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
         <h3>Sales Records</h3>
@@ -35,6 +41,15 @@
         </div>
     </div>
     <div class="table-container">
+        <div id="loading-indicator" class="loading-container">
+            <div class="loading-dots">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+            <p>Loading data...</p>
+        </div>
         <table id="sales-table">
             <thead>
                 <tr>
@@ -148,6 +163,24 @@
             <!-- Sale details will be loaded here dynamically -->
         </div>
     </div>
+</div>
+
+<!-- Delete Sale Confirmation Modal -->
+<div id="delete-sale-modal" class="modal">
+  <div class="modal-content">
+      <div class="modal-header">
+          <h3>Confirm Delete</h3>
+          <span class="close">&times;</span>
+      </div>
+      <div class="modal-body">
+          <p>Are you sure you want to delete this sale? This action cannot be undone.</p>
+          <input type="hidden" id="delete-sale-id">
+          <div class="form-actions">
+              <button type="button" class="btn btn-secondary" id="cancel-delete-sale">Cancel</button>
+              <button type="button" class="btn btn-danger" id="confirm-delete-sale">Delete</button>
+          </div>
+      </div>
+  </div>
 </div>
 
 {% endblock %}
@@ -490,12 +523,6 @@
         scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.1);
     }
 
-    /* Disabled state */
-    .form-group select:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-    }
-
     /* Custom dropdown arrow for Firefox */
     @-moz-document url-prefix() {
         .form-group select {
@@ -514,6 +541,77 @@
             padding: 1rem 0.75rem;
         }
     }
+
+.search-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.search-input {
+    flex: 1;
+    padding: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--secondary-color);
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(240, 248, 255, 0.2);
+}
+
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    text-align: center;
+}
+
+.loading-dots {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.dot {
+    width: 12px;
+    height: 12px;
+    margin: 0 5px;
+    background-color: var(--accent-color);
+    border-radius: 50%;
+    display: inline-block;
+    animation: dot-wave 1.5s infinite ease-in-out;
+}
+
+.dot:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.dot:nth-child(2) {
+    animation-delay: 0.3s;
+}
+
+.dot:nth-child(3) {
+    animation-delay: 0.6s;
+}
+
+.dot:nth-child(4) {
+    animation-delay: 0.9s;
+}
+
+@keyframes dot-wave {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-15px);
+    }
+}
 </style>
 {% endblock %}
 
@@ -541,6 +639,10 @@
         const todaySales = document.getElementById('today-sales');
         const weekSales = document.getElementById('week-sales');
         const monthSales = document.getElementById('month-sales');
+        const deleteSaleModal = document.getElementById('delete-sale-modal');
+        const customerSearch = document.getElementById('customer-search');
+        const searchBtn = document.getElementById('search-btn');
+        const resetSearchBtn = document.getElementById('reset-search-btn');
 
         // Debug element references
         console.log('Add Sale Button:', addSaleBtn);
@@ -563,6 +665,7 @@
                 addSaleModal.style.display = 'none';
                 addCustomerModal.style.display = 'none';
                 viewSaleModal.style.display = 'none';
+                deleteSaleModal.style.display = 'none';
             });
         });
 
@@ -573,6 +676,10 @@
 
         document.getElementById('cancel-customer').addEventListener('click', function() {
             addCustomerModal.style.display = 'none';
+        });
+
+        document.getElementById('cancel-delete-sale').addEventListener('click', function() {
+            deleteSaleModal.style.display = 'none';
         });
 
         // Show Add Sale Modal
@@ -1000,6 +1107,11 @@
         // Load Sales
         function loadSales() {
             console.log('Loading sales data...');
+            
+            // Show loading indicator
+            document.getElementById('loading-indicator').style.display = 'flex';
+            document.getElementById('sales-table').style.display = 'none';
+            
             fetch('/api/sales')
                 .then(response => {
                     console.log('Sales API response status:', response.status);
@@ -1007,74 +1119,188 @@
                 })
                 .then(sales => {
                     console.log('Sales data loaded:', sales.length, 'records');
-                    salesList.innerHTML = '';
+                    renderSales(sales);
                     
-                    let todayTotal = 0;
-                    let weekTotal = 0;
-                    let monthTotal = 0;
-                    
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    
-                    const weekStart = new Date(today);
-                    weekStart.setDate(today.getDate() - today.getDay());
-                    
-                    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-                    
-                    sales.forEach(sale => {
-                        const row = document.createElement('tr');
-                        
-                        const saleDate = new Date(sale.sale_date);
-                        
-                        // Calculate summary totals
-                        if (saleDate >= today) {
-                            todayTotal += sale.total_amount;
-                        }
-                        
-                        if (saleDate >= weekStart) {
-                            weekTotal += sale.total_amount;
-                        }
-                        
-                        if (saleDate >= monthStart) {
-                            monthTotal += sale.total_amount;
-                        }
-                        
-                        // Format products list
-                        const productsList = sale.items.map(item => item.product_name).join(', ');
-                        
-                        row.innerHTML = `
-                            <td>${sale.customer_name}</td>
-                            <td>${sale.customer_gst_id}</td>
-                            <td>${new Date(sale.sale_date).toLocaleDateString()}</td>
-                            <td>${productsList}</td>
-                            <td>₹${sale.total_amount.toFixed(2)}</td>
-                            <td>
-                                <button class="btn btn-secondary view-sale" data-id="${sale.id}" data-sale="${encodeURIComponent(JSON.stringify(sale))}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem;">View Details</button>
-                            </td>
-                        `;
-                        
-                        salesList.appendChild(row);
-                    });
-                    
-                    // Update summary cards
-                    todaySales.textContent = `₹${todayTotal.toFixed(2)}`;
-                    weekSales.textContent = `₹${weekTotal.toFixed(2)}`;
-                    monthSales.textContent = `₹${monthTotal.toFixed(2)}`;
-                    
-                    // Add event listeners to view buttons
-                    document.querySelectorAll('.view-sale').forEach(button => {
-                        button.addEventListener('click', function() {
-                            const saleData = JSON.parse(decodeURIComponent(this.getAttribute('data-sale')));
-                            showSaleDetails(saleData);
-                        });
-                    });
+                    // Hide loading indicator
+                    document.getElementById('loading-indicator').style.display = 'none';
+                    document.getElementById('sales-table').style.display = 'table';
                 })
                 .catch(error => {
                     console.error('Error loading sales:', error);
                     salesList.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 1rem;">Error loading sales data. Please try refreshing the page.</td></tr>`;
                     alert('An error occurred while loading sales');
+                    
+                    // Hide loading indicator even on error
+                    document.getElementById('loading-indicator').style.display = 'none';
+                    document.getElementById('sales-table').style.display = 'table';
                 });
         }
+
+        // Add renderSales function
+        function renderSales(sales) {
+            salesList.innerHTML = '';
+            
+            let todayTotal = 0;
+            let weekTotal = 0;
+            let monthTotal = 0;
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - today.getDay());
+            
+            const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+            
+            sales.forEach(sale => {
+                const row = document.createElement('tr');
+                
+                const saleDate = new Date(sale.sale_date);
+                
+                // Calculate summary totals
+                if (saleDate >= today) {
+                    todayTotal += sale.total_amount;
+                }
+                
+                if (saleDate >= weekStart) {
+                    weekTotal += sale.total_amount;
+                }
+                
+                if (saleDate >= monthStart) {
+                    monthTotal += sale.total_amount;
+                }
+                
+                // Format products list
+                const productsList = sale.items.map(item => item.product_name).join(', ');
+        
+        row.innerHTML = `
+            <td>${sale.customer_name}</td>
+            <td>${sale.customer_gst_id}</td>
+            <td>${new Date(sale.sale_date).toLocaleDateString()}</td>
+            <td>${productsList}</td>
+            <td>₹${sale.total_amount.toFixed(2)}</td>
+            <td>
+                <button class="btn btn-secondary view-sale" data-id="${sale.id}" data-sale="${encodeURIComponent(JSON.stringify(sale))}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem; margin-right: 0.5rem;">View Details</button>
+                <button class="btn btn-danger delete-sale" data-id="${sale.id}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem;">Delete</button>
+            </td>
+        `;
+        
+        salesList.appendChild(row);
+    });
+    
+    // Update summary cards
+    todaySales.textContent = `₹${todayTotal.toFixed(2)}`;
+    weekSales.textContent = `₹${weekTotal.toFixed(2)}`;
+    monthSales.textContent = `₹${monthTotal.toFixed(2)}`;
+    
+    // Add event listeners to view and delete buttons
+    document.querySelectorAll('.view-sale').forEach(button => {
+        button.addEventListener('click', function() {
+            const saleData = JSON.parse(decodeURIComponent(this.getAttribute('data-sale')));
+            showSaleDetails(saleData);
+        });
+    });
+    
+    document.querySelectorAll('.delete-sale').forEach(button => {
+        button.addEventListener('click', function() {
+            const saleId = this.getAttribute('data-id');
+            document.getElementById('delete-sale-id').value = saleId;
+            deleteSaleModal.style.display = 'block';
+        });
+    });
+}
+
+// Add delete sale functionality
+document.getElementById('confirm-delete-sale').addEventListener('click', function() {
+    const saleId = document.getElementById('delete-sale-id').value;
+    
+    fetch(`/api/sales/${saleId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            deleteSaleModal.style.display = 'none';
+            loadSales();
+        } else {
+            alert(data.message || 'Error deleting sale');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while deleting the sale');
+    });
+});
+
+// Delivery charges change
+deliveryCharges.addEventListener('input', calculateOrderTotal);
+
+// Close modal when clicking outside
+window.addEventListener('click', function(event) {
+    if (event.target === addSaleModal) {
+        addSaleModal.style.display = 'none';
+    }
+    if (event.target === addCustomerModal) {
+        addCustomerModal.style.display = 'none';
+    }
+    if (event.target === viewSaleModal) {
+        viewSaleModal.style.display = 'none';
+    }
+    if (event.target === deleteSaleModal) {
+        deleteSaleModal.style.display = 'none';
+    }
+});
+
+// Add search functionality
+searchBtn.addEventListener('click', function() {
+    const searchTerm = customerSearch.value.toLowerCase().trim();
+    if (searchTerm) {
+        filterSales(searchTerm);
+    }
+});
+
+resetSearchBtn.addEventListener('click', function() {
+    customerSearch.value = '';
+    loadSales();
+});
+
+customerSearch.addEventListener('keyup', function(e) {
+    if (e.key === 'Enter') {
+        const searchTerm = customerSearch.value.toLowerCase().trim();
+        if (searchTerm) {
+            filterSales(searchTerm);
+        }
+    }
+});
+
+function filterSales(searchTerm) {
+    // Show loading indicator
+    document.getElementById('loading-indicator').style.display = 'flex';
+    document.getElementById('sales-table').style.display = 'none';
+    
+    fetch('/api/sales')
+        .then(response => response.json())
+        .then(sales => {
+            const filteredSales = sales.filter(sale => 
+                sale.customer_name.toLowerCase().includes(searchTerm) || 
+                sale.customer_gst_id.toLowerCase().includes(searchTerm)
+            );
+            
+            renderSales(filteredSales);
+            
+            // Hide loading indicator
+            document.getElementById('loading-indicator').style.display = 'none';
+            document.getElementById('sales-table').style.display = 'table';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while searching sales');
+            
+            // Hide loading indicator even on error
+            document.getElementById('loading-indicator').style.display = 'none';
+            document.getElementById('sales-table').style.display = 'table';
+        });
+}
 
         // Show Sale Details
         function showSaleDetails(sale) {
@@ -1141,22 +1367,6 @@
             document.getElementById('sale-details-content').innerHTML = saleDetailsContent;
             viewSaleModal.style.display = 'block';
         }
-
-        // Delivery charges change
-        deliveryCharges.addEventListener('input', calculateOrderTotal);
-
-        // Close modal when clicking outside
-        window.addEventListener('click', function(event) {
-            if (event.target === addSaleModal) {
-                addSaleModal.style.display = 'none';
-            }
-            if (event.target === addCustomerModal) {
-                addCustomerModal.style.display = 'none';
-            }
-            if (event.target === viewSaleModal) {
-                viewSaleModal.style.display = 'none';
-            }
-        });
     });
 </script>
 {% endblock %}

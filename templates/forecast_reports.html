@@ -50,6 +50,17 @@
   </div>
 </div>
 
+<!-- Loading Indicator -->
+<div id="loading-indicator" class="loading-container" style="display: none;">
+  <div class="loading-dots">
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+  </div>
+  <p>Generating report...</p>
+</div>
+
 <!-- Data Status Message -->
 <div id="data-status-message" class="card" style="margin-bottom: 2rem; display: none;">
   <div class="card-body" style="padding: 1.5rem; text-align: center;">
@@ -335,6 +346,57 @@
     grid-template-columns: 1fr;
   }
 }
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.loading-dots {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  margin: 0 5px;
+  background-color: var(--accent-color);
+  border-radius: 50%;
+  display: inline-block;
+  animation: dot-wave 1.5s infinite ease-in-out;
+}
+
+.dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.dot:nth-child(2) {
+  animation-delay: 0.3s;
+}
+
+.dot:nth-child(3) {
+  animation-delay: 0.6s;
+}
+
+.dot:nth-child(4) {
+  animation-delay: 0.9s;
+}
+
+@keyframes dot-wave {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
 </style>
 {% endblock %}
 
@@ -486,6 +548,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Show loading state
     document.getElementById('data-status-message').style.display = 'none';
     document.getElementById('report-content').style.display = 'none';
+    document.getElementById('loading-indicator').style.display = 'flex';
     
     // Fetch data for the report
     Promise.all([
@@ -495,6 +558,9 @@ document.addEventListener('DOMContentLoaded', function() {
       fetch('/api/customers').then(response => response.json())
     ])
     .then(([sales, purchases, products, customers]) => {
+      // Hide loading indicator
+      document.getElementById('loading-indicator').style.display = 'none';
+      
       // Filter data by date range
       const filteredSales = sales.filter(sale => {
         const saleDate = new Date(sale.sale_date);
@@ -532,6 +598,7 @@ document.addEventListener('DOMContentLoaded', function() {
       // Show insufficient data message
       document.getElementById('data-status-message').style.display = 'block';
       document.getElementById('report-content').style.display = 'none';
+      document.getElementById('loading-indicator').style.display = 'none';
     });
   }
   
