@@ -8,7 +8,14 @@ import pytz
 import re
 from models import db, Customer, Vendor, Product, Sale, SaleItem, Purchase, PurchaseItem
 import time
+import logging
 from functools import wraps
+from sqlalchemy import create_engine
+from sqlalchemy.pool import QueuePool
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Create a Blueprint for import routes
 import_bp = Blueprint('import_bp', __name__)
@@ -16,21 +23,45 @@ import_bp = Blueprint('import_bp', __name__)
 # Define IST timezone
 IST = pytz.timezone('Asia/Kolkata')
 
-# Database connection retry decorator
-def db_retry(max_retries=3, retry_delay=1):
+# Configure database engine with optimized settings
+def get_db_engine():
+    database_url = "postgresql://forecast_vk_2_0_user:ShNUFtmifpJMpDeBwQ5RA5lg90qcNonG@dpg-cv4i8aogph6c7390jsug-a.oregon-postgres.render.com/forecast_vk_2_0"
+    return create_engine(
+        database_url,
+        poolclass=QueuePool,
+        pool_size=5,
+        max_overflow=10,
+        pool_timeout=30,
+        pool_recycle=60,
+        pool_pre_ping=True,
+        connect_args={
+            'connect_timeout': 30,
+            'application_name': 'forecast_vk_import'
+        }
+    )
+
+# Database connection retry decorator with exponential backoff
+def db_retry(max_retries=5, initial_delay=1):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            retries = 0
-            while retries < max_retries:
+            delay = initial_delay
+            last_exception = None
+            
+            for attempt in range(max_retries):
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:
-                    retries += 1
-                    if retries >= max_retries:
-                        raise
-                    print(f"Database operation failed, retrying ({retries}/{max_retries}): {str(e)}")
-                    time.sleep(retry_delay)
+                    last_exception = e
+                    logger.warning(f"Database operation failed (attempt {attempt + 1}/{max_retries}): {str(e)}")
+                    
+                    if attempt < max_retries - 1:
+                        time.sleep(delay)
+                        delay *= 2  # Exponential backoff
+                    
+            logger.error(f"All database retry attempts failed: {str(last_exception)}")
+            raise last_exception
+            
         return wrapper
     return decorator
 
@@ -41,14 +72,21 @@ def allowed_file(filename):
 # Helper function to create upload directory if it doesn't exist
 def ensure_upload_dir():
     upload_dir = os.path.join(current_app.root_path, 'uploads')
-    
     if not os.path.exists(upload_dir):
         os.makedirs(upload_dir)
     return upload_dir
 
-# Helper function to parse date based on format
+# Helper function to parse date based on format with better error handling
 def parse_date(date_str, date_format):
     try:
+        if isinstance(date_str, (datetime, pd.Timestamp)):
+            return date_str
+            
+        if pd.isna(date_str):
+            raise ValueError("Date string is empty or NaN")
+            
+        date_str = str(date_str).strip()
+        
         if date_format == 'DD/MM/YYYY':
             return datetime.strptime(date_str, '%d/%m/%Y')
         elif date_format == 'MM/DD/YYYY':
@@ -68,6 +106,7 @@ def parse_date(date_str, date_format):
                     continue
             raise ValueError(f"Could not parse date: {date_str}")
     except Exception as e:
+        logger.error(f"Error parsing date '{date_str}': {str(e)}")
         raise ValueError(f"Error parsing date '{date_str}': {str(e)}")
 
 # Helper function to generate a unique product ID from product name
@@ -83,6 +122,14 @@ def generate_product_id(product_name):
     suffix = str(random.randint(1000, 9999))
     
     return f"P{prefix}{suffix}"
+
+# Helper function to process data in chunks
+def process_dataframe_in_chunks(df, chunk_size=100):
+    num_chunks = len(df) // chunk_size + (1 if len(df) % chunk_size else 0)
+    for i in range(num_chunks):
+        start_idx = i * chunk_size
+        end_idx = min((i + 1) * chunk_size, len(df))
+        yield df.iloc[start_idx:end_idx]
 
 # Main import page route
 @import_bp.route('/import', methods=['GET'])
@@ -107,46 +154,58 @@ def validate_sales_file():
         return redirect(url_for('import_bp.import_sales'))
     
     if file and allowed_file(file.filename):
-        # Save the file
-        upload_dir = ensure_upload_dir()
-        filename = secure_filename(file.filename)
-        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-        saved_filename = f"sales_{timestamp}_{filename}"
-        file_path = os.path.join(upload_dir, saved_filename)
-        file.save(file_path)
-        
-        # Validate file structure
         try:
-            # Read the file
-            if file_path.endswith('.csv'):
-                df = pd.read_csv(file_path)
-            else:
-                df = pd.read_excel(file_path)
+            # Save the file
+            upload_dir = ensure_upload_dir()
+            filename = secure_filename(file.filename)
+            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+            saved_filename = f"sales_{timestamp}_{filename}"
+            file_path = os.path.join(upload_dir, saved_filename)
+            file.save(file_path)
             
-            # Check if the file has the required columns
-            required_columns = ['Invoice Number', 'Date', 'Customer Name', 'Product Name', 'Quantity', 'Total Amount']
-            
-            # Check if all required columns are present
-            missing_columns = [col for col in required_columns if col not in df.columns]
-            if missing_columns:
-                flash(f'Missing required columns: {", ".join(missing_columns)}', 'error')
-                os.remove(file_path)  # Remove the invalid file
+            # Validate file structure
+            try:
+                # Read the file
+                if file_path.endswith('.csv'):
+                    df = pd.read_csv(file_path)
+                else:
+                    df = pd.read_excel(file_path)
+                
+                # Check if the file has the required columns
+                required_columns = ['Invoice Number', 'Date', 'Customer Name', 'Product Name', 'Quantity', 'Total Amount']
+                
+                # Check if all required columns are present
+                missing_columns = [col for col in required_columns if col not in df.columns]
+                if missing_columns:
+                    flash(f'Missing required columns: {", ".join(missing_columns)}', 'error')
+                    os.remove(file_path)  # Remove the invalid file
+                    return redirect(url_for('import_bp.import_sales'))
+                
+                # Check if file is not empty
+                if len(df) == 0:
+                    flash('File is empty', 'error')
+                    os.remove(file_path)
+                    return redirect(url_for('import_bp.import_sales'))
+                
+                # File is valid, proceed to date format selection
+                return render_template('import_sales.html', step=2, file_path=file_path)
+                
+            except Exception as e:
+                logger.error(f"Error validating file: {str(e)}")
+                flash(f'Error validating file: {str(e)}', 'error')
+                if os.path.exists(file_path):
+                    os.remove(file_path)
                 return redirect(url_for('import_bp.import_sales'))
-            
-            # File is valid, proceed to date format selection
-            return render_template('import_sales.html', step=2, file_path=file_path)
-            
         except Exception as e:
-            flash(f'Error validating file: {str(e)}', 'error')
-            if os.path.exists(file_path):
-                os.remove(file_path)
+            logger.error(f"Error saving file: {str(e)}")
+            flash('Error saving file. Please try again.', 'error')
             return redirect(url_for('import_bp.import_sales'))
     else:
         flash('Invalid file type. Please upload an Excel (.xlsx, .xls) or CSV file.', 'error')
         return redirect(url_for('import_bp.import_sales'))
 
 @import_bp.route('/import/sales/preview', methods=['POST'])
-@db_retry(max_retries=3, retry_delay=2)
+@db_retry(max_retries=3, initial_delay=2)
 def preview_sales_data():
     file_path = request.form.get('file_path')
     date_format = request.form.get('date_format')
@@ -174,7 +233,8 @@ def preview_sales_data():
             try:
                 parsed_date = parse_date(str(date_str), date_format)
                 parsed_dates.append(parsed_date)
-            except ValueError:
+            except ValueError as e:
+                logger.warning(f"Date parsing warning: {str(e)}")
                 date_warnings = True
                 parsed_dates.append(None)
         
@@ -184,31 +244,35 @@ def preview_sales_data():
         preview_data = []
         
         for _, row in df.head(10).iterrows():
-            if pd.notna(row['parsed_date']):
-                date_display = row['parsed_date'].strftime('%Y-%m-%d')
-            else:
-                date_display = str(row['Date'])
-            
-            # Calculate unit price and tax
-            quantity = float(row['Quantity'])
-            total_amount = float(row['Total Amount'])
-            gst_percentage = 18.0  # Default GST
-            
-            # Calculate pre-tax amount: total_amount / (1 + gst_percentage/100)
-            pre_tax_amount = total_amount / (1 + gst_percentage/100)
-            tax_amount = total_amount - pre_tax_amount
-            unit_price = pre_tax_amount / quantity
-            
-            preview_data.append({
-                'invoice_number': row['Invoice Number'],
-                'date': date_display,
-                'customer_name': row['Customer Name'],
-                'product_name': row['Product Name'],
-                'quantity': int(quantity),
-                'unit_price': round(unit_price, 2),
-                'gst_amount': round(tax_amount, 2),
-                'total_amount': round(total_amount, 2)
-            })
+            try:
+                if pd.notna(row['parsed_date']):
+                    date_display = row['parsed_date'].strftime('%Y-%m-%d')
+                else:
+                    date_display = str(row['Date'])
+                
+                # Calculate unit price and tax
+                quantity = float(row['Quantity'])
+                total_amount = float(row['Total Amount'])
+                gst_percentage = 18.0  # Default GST
+                
+                # Calculate pre-tax amount: total_amount / (1 + gst_percentage/100)
+                pre_tax_amount = total_amount / (1 + gst_percentage/100)
+                tax_amount = total_amount - pre_tax_amount
+                unit_price = pre_tax_amount / quantity
+                
+                preview_data.append({
+                    'invoice_number': row['Invoice Number'],
+                    'date': date_display,
+                    'customer_name': row['Customer Name'],
+                    'product_name': row['Product Name'],
+                    'quantity': int(quantity),
+                    'unit_price': round(unit_price, 2),
+                    'gst_amount': round(tax_amount, 2),
+                    'total_amount': round(total_amount, 2)
+                })
+            except Exception as e:
+                logger.error(f"Error processing row: {str(e)}")
+                continue
         
         # Check if products exist
         product_names = df['Product Name'].unique()
@@ -223,21 +287,22 @@ def preview_sales_data():
         missing_customers = [name for name in customer_names if name not in existing_customer_names]
         
         return render_template('import_sales.html', 
-                              step=3, 
-                              file_path=file_path, 
-                              date_format=date_format,
-                              preview_data=preview_data,
-                              total_rows=len(df),
-                              date_warnings=date_warnings,
-                              missing_products=missing_products,
-                              missing_customers=missing_customers)
+                             step=3, 
+                             file_path=file_path, 
+                             date_format=date_format,
+                             preview_data=preview_data,
+                             total_rows=len(df),
+                             date_warnings=date_warnings,
+                             missing_products=missing_products,
+                             missing_customers=missing_customers)
     
     except Exception as e:
+        logger.error(f"Error processing file: {str(e)}")
         flash(f'Error processing file: {str(e)}', 'error')
         return redirect(url_for('import_bp.import_sales'))
 
 @import_bp.route('/import/sales/process', methods=['POST'])
-@db_retry(max_retries=3, retry_delay=2)
+@db_retry(max_retries=5, initial_delay=1)
 def process_sales_import():
     file_path = request.form.get('file_path')
     date_format = request.form.get('date_format')
@@ -260,7 +325,8 @@ def process_sales_import():
             try:
                 parsed_date = parse_date(str(date_str), date_format)
                 parsed_dates.append(parsed_date)
-            except ValueError:
+            except ValueError as e:
+                logger.warning(f"Date parsing warning: {str(e)}")
                 parsed_dates.append(None)
         
         df['parsed_date'] = parsed_dates
@@ -279,126 +345,137 @@ def process_sales_import():
         all_products = {p.name: p for p in Product.query.all()}
         all_customers = {c.name: c for c in Customer.query.all()}
         
-        # Group by invoice number and date
-        grouped = df.groupby(['Invoice Number', 'Customer Name'])
-        
-        for (invoice_number, customer_name), group_data in grouped:
+        # Process data in chunks
+        for chunk in process_dataframe_in_chunks(df, chunk_size=100):
             try:
-                # Get or create customer
-                if customer_name in all_customers:
-                    customer = all_customers[customer_name]
-                elif create_missing:
-                    # Create a new customer with placeholder data
-                    customer = Customer(
-                        name=customer_name,
-                        gst_id=f"CUST{len(all_customers) + 1}",  # Placeholder GST ID
-                        location="Unknown",  # Placeholder location
-                        contact_person="",
-                        phone="",
-                        about=f"Imported from Excel on {datetime.now().strftime('%Y-%m-%d')}"
-                    )
-                    db.session.add(customer)
-                    db.session.flush()  # Get ID without committing
-                    all_customers[customer_name] = customer
-                    import_results['new_customers'].append(customer_name)
-                else:
-                    import_results['errors'] += 1
-                    import_results['errors_list'].append(f"Customer not found: {customer_name}")
-                    continue
+                # Group by invoice number and customer name
+                grouped = chunk.groupby(['Invoice Number', 'Customer Name'])
                 
-                # Get the first valid date from the group
-                valid_dates = [d for d in group_data['parsed_date'] if pd.notna(d)]
-                if valid_dates:
-                    sale_date = valid_dates[0]
-                else:
-                    sale_date = datetime.now()
-                
-                # Calculate total amount for the sale
-                total_amount = 0
-                delivery_charges = 0  # Default to 0, can be updated if in the data
-                
-                # Create sale
-                sale = Sale(
-                    customer_id=customer.id,
-                    sale_date=sale_date,
-                    delivery_charges=delivery_charges,
-                    total_amount=0  # Will update after calculating items
-                )
-                db.session.add(sale)
-                db.session.flush()  # Get ID without committing
-                
-                # Process each item in the sale
-                for _, row in group_data.iterrows():
-                    product_name = row['Product Name']
-                    
-                    # Get or create product
-                    if product_name in all_products:
-                        product = all_products[product_name]
-                    elif create_missing:
-                        # Generate a unique product ID
-                        product_id = generate_product_id(product_name)
+                for (invoice_number, customer_name), group_data in grouped:
+                    try:
+                        # Get or create customer
+                        if customer_name in all_customers:
+                            customer = all_customers[customer_name]
+                        elif create_missing:
+                            # Create a new customer with placeholder data
+                            customer = Customer(
+                                name=customer_name,
+                                gst_id=f"CUST{len(all_customers) + 1}",  # Placeholder GST ID
+                                location="Unknown",  # Placeholder location
+                                contact_person="",
+                                phone="",
+                                about=f"Imported from Excel on {datetime.now().strftime('%Y-%m-%d')}"
+                            )
+                            db.session.add(customer)
+                            db.session.flush()  # Get ID without committing
+                            all_customers[customer_name] = customer
+                            import_results['new_customers'].append(customer_name)
+                        else:
+                            import_results['errors'] += 1
+                            import_results['errors_list'].append(f"Customer not found: {customer_name}")
+                            continue
                         
-                        # Create a new product with placeholder data
-                        product = Product(
-                            product_id=product_id,
-                            name=product_name,
-                            quantity=0,  # Initial quantity
-                            cost_per_unit=0,  # Will be updated based on sales/purchases
-                            specifications=""
+                        # Get the first valid date from the group
+                        valid_dates = [d for d in group_data['parsed_date'] if pd.notna(d)]
+                        if valid_dates:
+                            sale_date = valid_dates[0]
+                        else:
+                            sale_date = datetime.now()
+                        
+                        # Calculate total amount for the sale
+                        total_amount = 0
+                        delivery_charges = 0  # Default to 0, can be updated if in the data
+                        
+                        # Create sale
+                        sale = Sale(
+                            customer_id=customer.id,
+                            sale_date=sale_date,
+                            delivery_charges=delivery_charges,
+                            total_amount=0  # Will update after calculating items
                         )
-                        db.session.add(product)
+                        db.session.add(sale)
                         db.session.flush()  # Get ID without committing
-                        all_products[product_name] = product
-                        import_results['new_products'].append(product_name)
-                    else:
+                        
+                        # Process each item in the sale
+                        for _, row in group_data.iterrows():
+                            product_name = row['Product Name']
+                            
+                            # Get or create product
+                            if product_name in all_products:
+                                product = all_products[product_name]
+                            elif create_missing:
+                                # Generate a unique product ID
+                                product_id = generate_product_id(product_name)
+                                
+                                # Create a new product with placeholder data
+                                product = Product(
+                                    product_id=product_id,
+                                    name=product_name,
+                                    quantity=0,  # Initial quantity
+                                    cost_per_unit=0,  # Will be updated based on sales/purchases
+                                    specifications=""
+                                )
+                                db.session.add(product)
+                                db.session.flush()  # Get ID without committing
+                                all_products[product_name] = product
+                                import_results['new_products'].append(product_name)
+                            else:
+                                import_results['errors'] += 1
+                                import_results['errors_list'].append(f"Product not found: {product_name}")
+                                continue
+                            
+                            # Calculate item price
+                            quantity = int(row['Quantity'])
+                            total_amount_item = float(row['Total Amount'])
+                            gst_percentage = 18.0  # Default GST
+                            discount_percentage = 0.0  # Default discount
+                            
+                            # Calculate pre-tax amount
+                            pre_tax_amount = total_amount_item / (1 + gst_percentage/100)
+                            unit_price = pre_tax_amount / quantity
+                            
+                            # Check if enough stock
+                            if product.quantity < quantity:
+                                import_results['warnings'] += 1
+                                import_results['errors_list'].append(f"Warning: Not enough stock for product {product_name}. Current: {product.quantity}, Required: {quantity}")
+                            
+                            # Update product quantity
+                            product.quantity -= quantity
+                            
+                            # Create sale item
+                            sale_item = SaleItem(
+                                sale_id=sale.id,
+                                product_id=product.id,
+                                quantity=quantity,
+                                gst_percentage=gst_percentage,
+                                discount_percentage=discount_percentage,
+                                unit_price=unit_price,
+                                total_price=total_amount_item
+                            )
+                            db.session.add(sale_item)
+                            
+                            # Add to total amount
+                            total_amount += total_amount_item
+                        
+                        # Update sale total amount
+                        sale.total_amount = total_amount
+                        
+                        import_results['success'] += 1
+                        
+                    except Exception as e:
+                        logger.error(f"Error processing sale {invoice_number}: {str(e)}")
                         import_results['errors'] += 1
-                        import_results['errors_list'].append(f"Product not found: {product_name}")
+                        import_results['errors_list'].append(f"Error importing sale {invoice_number}: {str(e)}")
                         continue
-                    
-                    # Calculate item price
-                    quantity = int(row['Quantity'])
-                    total_amount_item = float(row['Total Amount'])
-                    gst_percentage = 18.0  # Default GST
-                    discount_percentage = 0.0  # Default discount
-                    
-                    # Calculate pre-tax amount
-                    pre_tax_amount = total_amount_item / (1 + gst_percentage/100)
-                    unit_price = pre_tax_amount / quantity
-                    
-                    # Check if enough stock
-                    if product.quantity < quantity:
-                        import_results['warnings'] += 1
-                        import_results['errors_list'].append(f"Warning: Not enough stock for product {product_name}. Current: {product.quantity}, Required: {quantity}")
-                    
-                    # Update product quantity
-                    product.quantity -= quantity
-                    
-                    # Create sale item
-                    sale_item = SaleItem(
-                        sale_id=sale.id,
-                        product_id=product.id,
-                        quantity=quantity,
-                        gst_percentage=gst_percentage,
-                        discount_percentage=discount_percentage,
-                        unit_price=unit_price,
-                        total_price=total_amount_item
-                    )
-                    db.session.add(sale_item)
-                    
-                    # Add to total amount
-                    total_amount += total_amount_item
                 
-                # Update sale total amount
-                sale.total_amount = total_amount
-                
-                import_results['success'] += 1
+                # Commit after each chunk
+                db.session.commit()
                 
             except Exception as e:
+                db.session.rollback()
+                logger.error(f"Error processing chunk: {str(e)}")
                 import_results['errors'] += 1
-                import_results['errors_list'].append(f"Error importing sale {invoice_number}: {str(e)}")
-        
-        # Commit all changes
-        db.session.commit()
+                import_results['errors_list'].append(f"Error processing chunk: {str(e)}")
         
         # Clean up the file
         if os.path.exists(file_path):
@@ -408,6 +485,7 @@ def process_sales_import():
     
     except Exception as e:
         db.session.rollback()
+        logger.error(f"Error importing data: {str(e)}")
         flash(f'Error importing data: {str(e)}', 'error')
         return redirect(url_for('import_bp.import_sales'))
 
@@ -468,7 +546,7 @@ def validate_purchases_file():
         return redirect(url_for('import_bp.import_purchases'))
 
 @import_bp.route('/import/purchases/preview', methods=['POST'])
-@db_retry(max_retries=3, retry_delay=2)
+@db_retry(max_retries=3, initial_delay=2)
 def preview_purchases_data():
     file_path = request.form.get('file_path')
     date_format = request.form.get('date_format')
@@ -496,7 +574,8 @@ def preview_purchases_data():
             try:
                 parsed_date = parse_date(str(date_str), date_format)
                 parsed_dates.append(parsed_date)
-            except ValueError:
+            except ValueError as e:
+                logger.warning(f"Date parsing warning: {str(e)}")
                 date_warnings = True
                 parsed_dates.append(None)
         
@@ -506,32 +585,36 @@ def preview_purchases_data():
         preview_data = []
         
         for _, row in df.head(10).iterrows():
-            if pd.notna(row['parsed_date']):
-                date_display = row['parsed_date'].strftime('%Y-%m-%d')
-            else:
-                date_display = str(row['Date'])
-            
-            # Calculate unit price and tax
-            quantity = float(row['Quantity'])
-            total_amount = float(row['Total Amount'])
-            gst_percentage = 18.0  # Default GST
-            
-            # Calculate pre-tax amount: total_amount / (1 + gst_percentage/100)
-            pre_tax_amount = total_amount / (1 + gst_percentage/100)
-            tax_amount = total_amount - pre_tax_amount
-            unit_price = pre_tax_amount / quantity
-            
-            preview_data.append({
-                'order_id': row['Order ID'],
-                'date': date_display,
-                'vendor_name': row['Vendor Name'],
-                'product_name': row['Product Name'],
-                'quantity': int(quantity),
-                'unit_price': round(unit_price, 2),
-                'gst_amount': round(tax_amount, 2),
-                'total_amount': round(total_amount, 2),
-                'status': 'Delivered'  # Default status
-            })
+            try:
+                if pd.notna(row['parsed_date']):
+                    date_display = row['parsed_date'].strftime('%Y-%m-%d')
+                else:
+                    date_display = str(row['Date'])
+                
+                # Calculate unit price and tax
+                quantity = float(row['Quantity'])
+                total_amount = float(row['Total Amount'])
+                gst_percentage = 18.0  # Default GST
+                
+                # Calculate pre-tax amount: total_amount / (1 + gst_percentage/100)
+                pre_tax_amount = total_amount / (1 + gst_percentage/100)
+                tax_amount = total_amount - pre_tax_amount
+                unit_price = pre_tax_amount / quantity
+                
+                preview_data.append({
+                    'order_id': row['Order ID'],
+                    'date': date_display,
+                    'vendor_name': row['Vendor Name'],
+                    'product_name': row['Product Name'],
+                    'quantity': int(quantity),
+                    'unit_price': round(unit_price, 2),
+                    'gst_amount': round(tax_amount, 2),
+                    'total_amount': round(total_amount, 2),
+                    'status': 'Delivered'  # Default status
+                })
+            except Exception as e:
+                logger.error(f"Error processing row: {str(e)}")
+                continue
         
         # Check if products exist
         product_names = df['Product Name'].unique()
@@ -560,7 +643,7 @@ def preview_purchases_data():
         return redirect(url_for('import_bp.import_purchases'))
 
 @import_bp.route('/import/purchases/process', methods=['POST'])
-@db_retry(max_retries=3, retry_delay=2)
+@db_retry(max_retries=3, initial_delay=2)
 def process_purchases_import():
     file_path = request.form.get('file_path')
     date_format = request.form.get('date_format')
@@ -583,7 +666,8 @@ def process_purchases_import():
             try:
                 parsed_date = parse_date(str(date_str), date_format)
                 parsed_dates.append(parsed_date)
-            except ValueError:
+            except ValueError as e:
+                logger.warning(f"Date parsing warning: {str(e)}")
                 parsed_dates.append(None)
         
         df['parsed_date'] = parsed_dates
