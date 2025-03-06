@@ -16,7 +16,7 @@
                             <div class="progress mb-3">
                                 <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
                             </div>
-                            <h5 id="status-message">Initializing import...</h5>
+                            <h5 id="status-message">Starting import...</h5>
                             <div id="loading-indicator" class="mt-3">
                                 <div class="dot-wave">
                                     <div class="dot-wave__dot"></div>
@@ -86,6 +86,8 @@
     const importType = "{{ import_type }}";
     let checkInterval;
     let isCompleted = false;
+    let retryCount = 0;
+    const maxRetries = 3;
     
     function updateViewDataButton() {
         const viewDataButton = document.getElementById('view-data-button');
@@ -100,6 +102,8 @@
         fetch(`/import/status/${importId}`)
             .then(response => response.json())
             .then(data => {
+                retryCount = 0; // Reset retry count on successful response
+                
                 // Update progress bar
                 const progressBar = document.getElementById('progress-bar');
                 progressBar.style.width = `${data.progress || 0}%`;
@@ -141,14 +145,6 @@
                             newItemsHtml += '</ul>';
                         }
                         
-                        if (data.new_vendors && data.new_vendors.length > 0) {
-                            newItemsHtml += '<h6>New Vendors:</h6><ul>';
-                            data.new_vendors.forEach(item => {
-                                newItemsHtml += `<li>${item}</li>`;
-                            });
-                            newItemsHtml += '</ul>';
-                        }
-                        
                         if (newItemsHtml) {
                             newItemsContainer.innerHTML = newItemsHtml;
                         }
@@ -183,12 +179,18 @@
             })
             .catch(error => {
                 console.error('Error checking status:', error);
+                retryCount++;
+                if (retryCount >= maxRetries) {
+                    clearInterval(checkInterval);
+                    document.getElementById('status-message').textContent = 'Error: Failed to check import status';
+                    document.getElementById('loading-indicator').style.display = 'none';
+                }
             });
     }
     
-    // Check status immediately and then every 2 seconds
+    // Check status immediately and then every second
     checkStatus();
-    checkInterval = setInterval(checkStatus, 1000);
+    checkInterval = setInterval(checkStatus, 500);
     
     // Update view data button on page load
     updateViewDataButton();

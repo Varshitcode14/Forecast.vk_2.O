@@ -27,11 +27,19 @@ import_bp = Blueprint('import_bp', __name__)
 # Define IST timezone
 IST = pytz.timezone('Asia/Kolkata')
 
-# Global import status tracking
+# Remove the queue and thread-related imports and variables
 import_status = {}
-import_queue = queue.Queue()
-import_thread = None
-import_thread_running = False
+
+# Simplified status handling
+def save_import_status(import_id, status_data):
+    import_status[import_id] = status_data
+    logger.info(f"Status updated for {import_id}: {status_data}")
+
+def get_import_status(import_id):
+    return import_status.get(import_id, {
+        'status': 'error',
+        'message': 'Import not found'
+    })
 
 # Configure database engine with optimized settings for Render
 def get_db_engine():
@@ -150,315 +158,227 @@ def process_dataframe_in_chunks(df, chunk_size=50):
 
 # Function to save import status
 def save_import_status(import_id, status_data):
-    status_dir = ensure_status_dir()
-    status_file = os.path.join(status_dir, f"{import_id}.json")
-    
-    with open(status_file, 'w') as f:
-        json.dump(status_data, f)
+    import_status[import_id] = status_data
+    logger.info(f"Status updated for {import_id}: {status_data}")
 
 # Function to get import status
 def get_import_status(import_id):
-    status_dir = ensure_status_dir()
-    status_file = os.path.join(status_dir, f"{import_id}.json")
-    
-    if os.path.exists(status_file):
-        with open(status_file, 'r') as f:
-            return json.load(f)
-    return None
+    return import_status.get(import_id, {
+        'status': 'error',
+        'message': 'Import not found'
+    })
 
-# Background worker function for processing imports
-def process_imports_worker():
-    global import_thread_running
-    
-    while import_thread_running:
-        try:
-            # Get an import task from the queue with a shorter timeout
-            try:
-                task = import_queue.get(timeout=1)  # Reduced timeout from 5 to 1 second
-            except queue.Empty:
-                continue
-            
-            import_id = task['import_id']
-            import_type = task['import_type']
-            file_path = task['file_path']
-            date_format = task['date_format']
-            create_missing = task.get('create_missing', False)
-            
-            logger.info(f"Starting import process for {import_id}")
-            
-            # Update status to processing immediately
-            status_data = {
+# Process sales import directly
+def process_sales_import(import_id, file_path, date_format, create_missing):
+    try:
+        with current_app.app_context():
+            # Initialize status
+            save_import_status(import_id, {
                 'status': 'processing',
                 'progress': 5,
-                'message': f"Starting {import_type} import...",
+                'message': 'Reading file...',
                 'success': 0,
                 'warnings': 0,
                 'errors': 0,
-                'new_items': [],
+                'new_customers': [],
+                'new_products': [],
                 'errors_list': []
-            }
-            save_import_status(import_id, status_data)
-            
-            try:
-                # Process the import based on type
-                if import_type == 'sales':
-                    process_sales_import_background(import_id, file_path, date_format, create_missing)
-                elif import_type == 'purchases':
-                    process_purchases_import_background(import_id, file_path, date_format, create_missing)
-                
-                logger.info(f"Import {import_id} completed successfully")
-                
-            except Exception as e:
-                logger.error(f"Error in background import {import_id}: {str(e)}")
-                status_data = {
-                    'status': 'error',
-                    'progress': 100,
-                    'message': f"Error: {str(e)}",
-                    'errors_list': [str(e)]
-                }
-                save_import_status(import_id, status_data)
-            
-            # Mark task as done
-            import_queue.task_done()
-            
-            # Force garbage collection
-            gc.collect()
-            
-        except Exception as e:
-            logger.error(f"Error in import worker: {str(e)}")
-            time.sleep(1)  # Reduced wait time from 5 to 1 second
+            })
 
-# Start the background worker thread
-def start_import_worker():
-    global import_thread, import_thread_running
-    
-    if import_thread is None or not import_thread.is_alive():
-        import_thread_running = True
-        import_thread = threading.Thread(target=process_imports_worker)
-        import_thread.daemon = True
-        import_thread.start()
-        logger.info("Import worker thread started")
+            # Read the file
+            if file_path.endswith('.csv'):
+                df = pd.read_csv(file_path)
+            else:
+                df = pd.read_excel(file_path)
 
-# Process sales import in background
-def process_sales_import_background(import_id, file_path, date_format, create_missing):
-    try:
-        # Read the file
-        if file_path.endswith('.csv'):
-            df = pd.read_csv(file_path)
-        else:
-            df = pd.read_excel(file_path)
-        
-        total_rows = len(df)
-        
-        # Parse dates
-        parsed_dates = []
-        for date_str in df['Date']:
-            try:
-                parsed_date = parse_date(str(date_str), date_format)
-                parsed_dates.append(parsed_date)
-            except ValueError:
-                parsed_dates.append(None)
-        
-        df['parsed_date'] = parsed_dates
-        
-        # Initialize results
-        import_results = {
-            'status': 'processing',
-            'progress': 10,
-            'message': "Processing sales data...",
-            'success': 0,
-            'warnings': 0,
-            'errors': 0,
-            'new_customers': [],
-            'new_products': [],
-            'errors_list': []
-        }
-        save_import_status(import_id, import_results)
-        
-        # Get existing products and customers
-        with db.engine.connect() as connection:
-            # Create a new session with this connection
-            from sqlalchemy.orm import sessionmaker
-            Session = sessionmaker(bind=connection)
-            session = Session()
-            
-            try:
-                all_products = {p.name: p for p in session.query(Product).all()}
-                all_customers = {c.name: c for c in session.query(Customer).all()}
-                
-                # Process data in smaller chunks for production
-                chunk_size = 10  # Smaller chunks for quicker updates
-                chunks = list(process_dataframe_in_chunks(df, chunk_size))
-                total_chunks = len(chunks)
-                
-                for chunk_idx, chunk in enumerate(chunks):
-                    try:
-                        # Update progress
-                        progress = 10 + int(90 * (chunk_idx / total_chunks))  # Changed from 80 to 90 for more visible progress
-                        import_results['progress'] = progress
-                        import_results['message'] = f"Processing records {chunk_idx * chunk_size + 1} to {min((chunk_idx + 1) * chunk_size, total_rows)}..."
-                        save_import_status(import_id, import_results)
-                        
-                        # Group by invoice number and customer name
-                        grouped = chunk.groupby(['Invoice Number', 'Customer Name'])
-                        
-                        for (invoice_number, customer_name), group_data in grouped:
-                            try:
-                                # Get or create customer
-                                if customer_name in all_customers:
-                                    customer = all_customers[customer_name]
-                                elif create_missing:
-                                    # Create a new customer with placeholder data
-                                    customer = Customer(
-                                        name=customer_name,
-                                        gst_id=f"CUST{len(all_customers) + 1}",  # Placeholder GST ID
-                                        location="Unknown",  # Placeholder location
-                                        contact_person="",
-                                        phone="",
-                                        about=f"Imported from Excel on {datetime.now().strftime('%Y-%m-%d')}"
-                                    )
-                                    session.add(customer)
-                                    session.flush()  # Get ID without committing
-                                    all_customers[customer_name] = customer
-                                    import_results['new_customers'].append(customer_name)
-                                else:
-                                    import_results['errors'] += 1
-                                    import_results['errors_list'].append(f"Customer not found: {customer_name}")
-                                    continue
-                                
-                                # Get the first valid date from the group
-                                valid_dates = [d for d in group_data['parsed_date'] if pd.notna(d)]
-                                if valid_dates:
-                                    sale_date = valid_dates[0]
-                                else:
-                                    sale_date = datetime.now()
-                                
-                                # Calculate total amount for the sale
-                                total_amount = 0
-                                delivery_charges = 0  # Default to 0, can be updated if in the data
-                                
-                                # Create sale
-                                sale = Sale(
-                                    customer_id=customer.id,
-                                    sale_date=sale_date,
-                                    delivery_charges=delivery_charges,
-                                    total_amount=0  # Will update after calculating items
+            total_rows = len(df)
+            logger.info(f"Processing {total_rows} rows for import {import_id}")
+
+            # Update status
+            save_import_status(import_id, {
+                'status': 'processing',
+                'progress': 10,
+                'message': f'Processing {total_rows} records...',
+                'success': 0,
+                'warnings': 0,
+                'errors': 0,
+                'new_customers': [],
+                'new_products': [],
+                'errors_list': []
+            })
+
+            # Process in smaller chunks
+            chunk_size = 50
+            chunks = [df[i:i + chunk_size] for i in range(0, len(df), chunk_size)]
+
+            success_count = 0
+            warning_count = 0
+            error_count = 0
+            new_customers = set()
+            new_products = set()
+            errors_list = []
+
+            # Get existing products and customers
+            existing_products = {p.name: p for p in Product.query.all()}
+            existing_customers = {c.name: c for c in Customer.query.all()}
+
+            # Process each chunk
+            for chunk_idx, chunk in enumerate(chunks):
+                try:
+                    # Group by invoice
+                    grouped = chunk.groupby(['Invoice Number', 'Customer Name'])
+                    
+                    for (invoice_number, customer_name), group in grouped:
+                        try:
+                            # Get or create customer
+                            customer = existing_customers.get(customer_name)
+                            if not customer and create_missing:
+                                customer = Customer(
+                                    name=customer_name,
+                                    gst_id=f"CUST{len(existing_customers) + 1}",
+                                    location="Unknown"
                                 )
-                                session.add(sale)
-                                session.flush()  # Get ID without committing
-                                
-                                # Process each item in the sale
-                                for _, row in group_data.iterrows():
-                                    product_name = row['Product Name']
-                                    
-                                    # Get or create product
-                                    if product_name in all_products:
-                                        product = all_products[product_name]
-                                    elif create_missing:
-                                        # Generate a unique product ID
-                                        product_id = generate_product_id(product_name)
-                                        
-                                        # Create a new product with placeholder data
-                                        product = Product(
-                                            product_id=product_id,
-                                            name=product_name,
-                                            quantity=0,  # Initial quantity
-                                            cost_per_unit=0,  # Will be updated based on sales/purchases
-                                            specifications=""
-                                        )
-                                        session.add(product)
-                                        session.flush()  # Get ID without committing
-                                        all_products[product_name] = product
-                                        import_results['new_products'].append(product_name)
-                                    else:
-                                        import_results['errors'] += 1
-                                        import_results['errors_list'].append(f"Product not found: {product_name}")
-                                        continue
-                                    
-                                    # Calculate item price
-                                    quantity = int(row['Quantity'])
-                                    total_amount_item = float(row['Total Amount'])
-                                    gst_percentage = 18.0  # Default GST
-                                    discount_percentage = 0.0  # Default discount
-                                    
-                                    # Calculate pre-tax amount
-                                    pre_tax_amount = total_amount_item / (1 + gst_percentage/100)
-                                    unit_price = pre_tax_amount / quantity
-                                    
-                                    # Check if enough stock
-                                    if product.quantity < quantity:
-                                        import_results['warnings'] += 1
-                                        import_results['errors_list'].append(f"Warning: Not enough stock for product {product_name}. Current: {product.quantity}, Required: {quantity}")
-                                    
-                                    # Update product quantity
-                                    product.quantity -= quantity
-                                    
-                                    # Create sale item
-                                    sale_item = SaleItem(
-                                        sale_id=sale.id,
-                                        product_id=product.id,
-                                        quantity=quantity,
-                                        gst_percentage=gst_percentage,
-                                        discount_percentage=discount_percentage,
-                                        unit_price=unit_price,
-                                        total_price=total_amount_item
-                                    )
-                                    session.add(sale_item)
-                                    
-                                    # Add to total amount
-                                    total_amount += total_amount_item
-                                
-                                # Update sale total amount
-                                sale.total_amount = total_amount
-                                
-                                import_results['success'] += 1
-                                
-                            except Exception as e:
-                                logger.error(f"Error processing sale {invoice_number}: {str(e)}")
-                                import_results['errors'] += 1
-                                import_results['errors_list'].append(f"Error importing sale {invoice_number}: {str(e)}")
+                                db.session.add(customer)
+                                db.session.flush()
+                                existing_customers[customer_name] = customer
+                                new_customers.add(customer_name)
+
+                            if not customer:
+                                error_count += 1
+                                errors_list.append(f"Customer not found: {customer_name}")
                                 continue
-                        
-                        # Commit after each chunk
-                        session.commit()
-                        
-                        # Force garbage collection after each chunk
-                        gc.collect()
-                        
-                    except Exception as e:
-                        session.rollback()
-                        logger.error(f"Error processing chunk: {str(e)}")
-                        import_results['errors'] += 1
-                        import_results['errors_list'].append(f"Error processing chunk: {str(e)}")
-                
-                # Update final status
-                import_results['status'] = 'completed'
-                import_results['progress'] = 100
-                import_results['message'] = "Import completed successfully"
-                save_import_status(import_id, import_results)
-                
-            except Exception as e:
-                session.rollback()
-                logger.error(f"Error in sales import: {str(e)}")
-                import_results['status'] = 'error'
-                import_results['message'] = f"Error: {str(e)}"
-                import_results['errors_list'].append(str(e))
-                save_import_status(import_id, import_results)
-            finally:
-                session.close()
-        
-        # Clean up the file
+
+                            # Create sale
+                            sale = Sale(
+                                customer_id=customer.id,
+                                sale_date=datetime.now(),
+                                delivery_charges=0,
+                                total_amount=0
+                            )
+                            db.session.add(sale)
+                            db.session.flush()
+
+                            total_amount = 0
+                            for _, row in group.iterrows():
+                                product_name = row['Product Name']
+                                product = existing_products.get(product_name)
+
+                                if not product and create_missing:
+                                    product = Product(
+                                        product_id=generate_product_id(product_name),
+                                        name=product_name,
+                                        quantity=0,
+                                        cost_per_unit=0
+                                    )
+                                    db.session.add(product)
+                                    db.session.flush()
+                                    existing_products[product_name] = product
+                                    new_products.add(product_name)
+
+                                if not product:
+                                    error_count += 1
+                                    errors_list.append(f"Product not found: {product_name}")
+                                    continue
+
+                                quantity = int(row['Quantity'])
+                                total_amount_item = float(row['Total Amount'])
+
+                                sale_item = SaleItem(
+                                    sale_id=sale.id,
+                                    product_id=product.id,
+                                    quantity=quantity,
+                                    gst_percentage=18.0,
+                                    discount_percentage=0,
+                                    unit_price=total_amount_item / quantity,
+                                    total_price=total_amount_item
+                                )
+                                db.session.add(sale_item)
+                                total_amount += total_amount_item
+
+                            sale.total_amount = total_amount
+                            success_count += 1
+
+                        except Exception as e:
+                            error_count += 1
+                            errors_list.append(f"Error processing invoice {invoice_number}: {str(e)}")
+                            logger.error(f"Error processing invoice: {str(e)}")
+                            continue
+
+                    # Commit after each chunk
+                    db.session.commit()
+
+                    # Update progress
+                    progress = 10 + int(85 * (chunk_idx + 1) / len(chunks))
+                    save_import_status(import_id, {
+                        'status': 'processing',
+                        'progress': progress,
+                        'message': f'Processed {(chunk_idx + 1) * chunk_size} of {total_rows} records...',
+                        'success': success_count,
+                        'warnings': warning_count,
+                        'errors': error_count,
+                        'new_customers': list(new_customers),
+                        'new_products': list(new_products),
+                        'errors_list': errors_list
+                    })
+
+                except Exception as e:
+                    logger.error(f"Error processing chunk: {str(e)}")
+                    error_count += 1
+                    errors_list.append(f"Error processing chunk: {str(e)}")
+
+            # Final status update
+            save_import_status(import_id, {
+                'status': 'completed',
+                'progress': 100,
+                'message': 'Import completed successfully',
+                'success': success_count,
+                'warnings': warning_count,
+                'errors': error_count,
+                'new_customers': list(new_customers),
+                'new_products': list(new_products),
+                'errors_list': errors_list
+            })
+
+            # Clean up
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+    except Exception as e:
+        logger.error(f"Error in import: {str(e)}")
+        save_import_status(import_id, {
+            'status': 'error',
+            'progress': 100,
+            'message': f'Error: {str(e)}',
+            'errors_list': [str(e)]
+        })
         if os.path.exists(file_path):
             os.remove(file_path)
-            
+
+# Update the process route to use direct processing
+@import_bp.route('/import/sales/process', methods=['POST'])
+def process_sales_import_route():
+    file_path = request.form.get('file_path')
+    date_format = request.form.get('date_format')
+    create_missing = request.form.get('create_missing') == 'yes'
+    
+    if not file_path or not os.path.exists(file_path):
+        flash('File not found. Please upload again.', 'error')
+        return redirect(url_for('import_bp.import_sales'))
+    
+    try:
+        # Generate a unique import ID
+        import_id = f"sales_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        
+        # Start processing in the current thread
+        process_sales_import(import_id, file_path, date_format, create_missing)
+        
+        # Return the status page
+        return render_template('import_status.html', import_id=import_id, import_type='sales')
+        
     except Exception as e:
-        logger.error(f"Error in sales import: {str(e)}")
-        import_results = {
-            'status': 'error',
-            'message': f"Error: {str(e)}",
-            'errors_list': [str(e)]
-        }
-        save_import_status(import_id, import_results)
+        logger.error(f"Error starting import: {str(e)}")
+        flash(f'Error starting import: {str(e)}', 'error')
+        return redirect(url_for('import_bp.import_sales'))
 
 # Process purchases import in background
 def process_purchases_import_background(import_id, file_path, date_format, create_missing):
@@ -710,15 +630,11 @@ def process_purchases_import_background(import_id, file_path, date_format, creat
 # Main import page route
 @import_bp.route('/import', methods=['GET'])
 def import_data():
-    # Start the background worker if not already running
-    start_import_worker()
     return render_template('import_data.html')
 
 # Sales import routes
 @import_bp.route('/import/sales', methods=['GET'])
 def import_sales():
-    # Start the background worker if not already running
-    start_import_worker()
     return render_template('import_sales.html', step=1)
 
 @import_bp.route('/import/sales/validate', methods=['POST'])
@@ -881,8 +797,9 @@ def preview_sales_data():
         flash(f'Error processing file: {str(e)}', 'error')
         return redirect(url_for('import_bp.import_sales'))
 
+# Update the process route to use direct processing
 @import_bp.route('/import/sales/process', methods=['POST'])
-def process_sales_import():
+def process_sales_import_route():
     file_path = request.form.get('file_path')
     date_format = request.form.get('date_format')
     create_missing = request.form.get('create_missing') == 'yes'
@@ -895,43 +812,20 @@ def process_sales_import():
         # Generate a unique import ID
         import_id = f"sales_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
-        # Add to the import queue
-        import_queue.put({
-            'import_id': import_id,
-            'import_type': 'sales',
-            'file_path': file_path,
-            'date_format': date_format,
-            'create_missing': create_missing
-        })
-        
-        # Initialize status
-        status_data = {
-            'status': 'queued',
-            'progress': 0,
-            'message': 'Import queued, waiting to start...'
-        }
-        save_import_status(import_id, status_data)
-        
-        time.sleep(0.5)  # Short delay to allow worker to pick up the task
-        status_data = get_import_status(import_id)
-        if not status_data or status_data.get('status') == 'error':
-            logger.error(f"Import failed to start: {import_id}")
-            flash('Import failed to start. Please try again.', 'error')
-            return redirect(url_for('import_bp.import_data'))
+        # Start processing in the current thread
+        process_sales_import(import_id, file_path, date_format, create_missing)
         
         # Return the status page
         return render_template('import_status.html', import_id=import_id, import_type='sales')
         
     except Exception as e:
-        logger.error(f"Error queuing import: {str(e)}")
+        logger.error(f"Error starting import: {str(e)}")
         flash(f'Error starting import: {str(e)}', 'error')
         return redirect(url_for('import_bp.import_sales'))
 
 # Purchases import routes
 @import_bp.route('/import/purchases', methods=['GET'])
 def import_purchases():
-    # Start the background worker if not already running
-    start_import_worker()
     return render_template('import_purchases.html', step=1)
 
 @import_bp.route('/import/purchases/validate', methods=['POST'])
@@ -1089,7 +983,7 @@ def preview_purchases_data():
         return redirect(url_for('import_bp.import_purchases'))
 
 @import_bp.route('/import/purchases/process', methods=['POST'])
-def process_purchases_import():
+def process_purchases_import_route():
     file_path = request.form.get('file_path')
     date_format = request.form.get('date_format')
     create_missing = request.form.get('create_missing') == 'yes'
@@ -1102,35 +996,14 @@ def process_purchases_import():
         # Generate a unique import ID
         import_id = f"purchases_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
-        # Add to the import queue
-        import_queue.put({
-            'import_id': import_id,
-            'import_type': 'purchases',
-            'file_path': file_path,
-            'date_format': date_format,
-            'create_missing': create_missing
-        })
-        
-        # Initialize status
-        status_data = {
-            'status': 'queued',
-            'progress': 0,
-            'message': 'Import queued, waiting to start...'
-        }
-        save_import_status(import_id, status_data)
-        
-        time.sleep(0.5)  # Short delay to allow worker to pick up the task
-        status_data = get_import_status(import_id)
-        if not status_data or status_data.get('status') == 'error':
-            logger.error(f"Import failed to start: {import_id}")
-            flash('Import failed to start. Please try again.', 'error')
-            return redirect(url_for('import_bp.import_data'))
+        # Start processing in the current thread
+        process_purchases_import(import_id, file_path, date_format, create_missing)
         
         # Return the status page
         return render_template('import_status.html', import_id=import_id, import_type='purchases')
         
     except Exception as e:
-        logger.error(f"Error queuing import: {str(e)}")
+        logger.error(f"Error starting import: {str(e)}")
         flash(f'Error starting import: {str(e)}', 'error')
         return redirect(url_for('import_bp.import_purchases'))
 
@@ -1142,4 +1015,206 @@ def check_import_status(import_id):
         return jsonify(status_data)
     else:
         return jsonify({'status': 'error', 'message': 'Import not found'})
+
+# Process purchases import directly
+def process_purchases_import(import_id, file_path, date_format, create_missing):
+    try:
+        with current_app.app_context():
+            # Initialize status
+            save_import_status(import_id, {
+                'status': 'processing',
+                'progress': 5,
+                'message': 'Reading file...',
+                'success': 0,
+                'warnings': 0,
+                'errors': 0,
+                'new_vendors': [],
+                'new_products': [],
+                'errors_list': []
+            })
+
+            # Read the file
+            if file_path.endswith('.csv'):
+                df = pd.read_csv(file_path)
+            else:
+                df = pd.read_excel(file_path)
+
+            total_rows = len(df)
+            logger.info(f"Processing {total_rows} rows for import {import_id}")
+
+            # Update status
+            save_import_status(import_id, {
+                'status': 'processing',
+                'progress': 10,
+                'message': f'Processing {total_rows} records...',
+                'success': 0,
+                'warnings': 0,
+                'errors': 0,
+                'new_vendors': [],
+                'new_products': [],
+                'errors_list': []
+            })
+
+            # Process in smaller chunks
+            chunk_size = 50
+            chunks = [df[i:i + chunk_size] for i in range(0, len(df), chunk_size)]
+
+            success_count = 0
+            warning_count = 0
+            error_count = 0
+            new_vendors = set()
+            new_products = set()
+            errors_list = []
+
+            # Get existing products and vendors
+            existing_products = {p.name: p for p in Product.query.all()}
+            existing_vendors = {v.name: v for v in Vendor.query.all()}
+            # Also create case-insensitive lookup
+            existing_vendors_lower = {v.name.strip().lower(): v for v in Vendor.query.all()}
+
+            # Process each chunk
+            for chunk_idx, chunk in enumerate(chunks):
+                try:
+                    # Group by order ID and vendor
+                    grouped = chunk.groupby(['Order ID', 'Vendor Name'])
+                    
+                    for (order_id, vendor_name), group in grouped:
+                        try:
+                            # Get or create vendor
+                            vendor = existing_vendors.get(vendor_name)
+                            if not vendor:
+                                vendor = existing_vendors_lower.get(vendor_name.strip().lower())
+                            
+                            if not vendor and create_missing:
+                                vendor = Vendor(
+                                    name=vendor_name,
+                                    gst_id=f"VEND{len(existing_vendors) + 1}",
+                                    location="Unknown"
+                                )
+                                db.session.add(vendor)
+                                db.session.flush()
+                                existing_vendors[vendor_name] = vendor
+                                existing_vendors_lower[vendor_name.strip().lower()] = vendor
+                                new_vendors.add(vendor_name)
+
+                            if not vendor:
+                                error_count += 1
+                                errors_list.append(f"Vendor not found: {vendor_name}")
+                                continue
+
+                            # Create purchase
+                            purchase = Purchase(
+                                vendor_id=vendor.id,
+                                purchase_date=datetime.now(),
+                                order_id=order_id,
+                                delivery_charges=0,
+                                total_amount=0,
+                                status="Delivered"
+                            )
+                            db.session.add(purchase)
+                            db.session.flush()
+
+                            total_amount = 0
+                            for _, row in group.iterrows():
+                                product_name = row['Product Name']
+                                product = existing_products.get(product_name)
+
+                                if not product and create_missing:
+                                    product = Product(
+                                        product_id=generate_product_id(product_name),
+                                        name=product_name,
+                                        quantity=0,
+                                        cost_per_unit=0
+                                    )
+                                    db.session.add(product)
+                                    db.session.flush()
+                                    existing_products[product_name] = product
+                                    new_products.add(product_name)
+
+                                if not product:
+                                    error_count += 1
+                                    errors_list.append(f"Product not found: {product_name}")
+                                    continue
+
+                                quantity = int(row['Quantity'])
+                                total_amount_item = float(row['Total Amount'])
+                                gst_percentage = 18.0  # Default GST
+
+                                # Calculate pre-tax amount
+                                pre_tax_amount = total_amount_item / (1 + gst_percentage/100)
+                                unit_price = pre_tax_amount / quantity
+
+                                purchase_item = PurchaseItem(
+                                    purchase_id=purchase.id,
+                                    product_id=product.id,
+                                    quantity=quantity,
+                                    gst_percentage=gst_percentage,
+                                    unit_price=unit_price,
+                                    total_price=total_amount_item
+                                )
+                                db.session.add(purchase_item)
+                                
+                                # Update product quantity
+                                product.quantity += quantity
+                                
+                                total_amount += total_amount_item
+
+                            purchase.total_amount = total_amount
+                            success_count += 1
+
+                        except Exception as e:
+                            error_count += 1
+                            errors_list.append(f"Error processing order {order_id}: {str(e)}")
+                            logger.error(f"Error processing order: {str(e)}")
+                            continue
+
+                    # Commit after each chunk
+                    db.session.commit()
+
+                    # Update progress
+                    progress = 10 + int(85 * (chunk_idx + 1) / len(chunks))
+                    save_import_status(import_id, {
+                        'status': 'processing',
+                        'progress': progress,
+                        'message': f'Processed {(chunk_idx + 1) * chunk_size} of {total_rows} records...',
+                        'success': success_count,
+                        'warnings': warning_count,
+                        'errors': error_count,
+                        'new_vendors': list(new_vendors),
+                        'new_products': list(new_products),
+                        'errors_list': errors_list
+                    })
+
+                except Exception as e:
+                    logger.error(f"Error processing chunk: {str(e)}")
+                    error_count += 1
+                    errors_list.append(f"Error processing chunk: {str(e)}")
+
+            # Final status update
+            save_import_status(import_id, {
+                'status': 'completed',
+                'progress': 100,
+                'message': 'Import completed successfully',
+                'success': success_count,
+                'warnings': warning_count,
+                'errors': error_count,
+                'new_vendors': list(new_vendors),
+                'new_products': list(new_products),
+                'errors_list': errors_list
+            })
+
+            # Clean up
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+    except Exception as e:
+        logger.error(f"Error in import: {str(e)}")
+        save_import_status(import_id, {
+            'status': 'error',
+            'progress': 100,
+            'message': f'Error: {str(e)}',
+            'errors_list': [str(e)]
+        })
+        if os.path.exists(file_path):
+            os.remove(file_path)
 
