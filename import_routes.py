@@ -355,8 +355,8 @@ def process_sales_import(import_id, file_path, date_format, create_missing):
             os.remove(file_path)
 
 # Update the process route to use direct processing
-@import_bp.route('/import/sales/process', methods=['POST'])
-def process_sales_import_route():
+@import_bp.route('/import/sales/process', methods=['POST'], endpoint='process_sales_import_route')
+def process_sales_import():
     file_path = request.form.get('file_path')
     date_format = request.form.get('date_format')
     create_missing = request.form.get('create_missing') == 'yes'
@@ -798,8 +798,8 @@ def preview_sales_data():
         return redirect(url_for('import_bp.import_sales'))
 
 # Update the process route to use direct processing
-@import_bp.route('/import/sales/process', methods=['POST'])
-def process_sales_import_route():
+@import_bp.route('/import/sales/process', methods=['POST'], endpoint='process_sales_import_route')
+def process_sales_import():
     file_path = request.form.get('file_path')
     date_format = request.form.get('date_format')
     create_missing = request.form.get('create_missing') == 'yes'
@@ -982,8 +982,8 @@ def preview_purchases_data():
         flash(f'Error processing file: {str(e)}', 'error')
         return redirect(url_for('import_bp.import_purchases'))
 
-@import_bp.route('/import/purchases/process', methods=['POST'])
-def process_purchases_import_route():
+@import_bp.route('/import/purchases/process', methods=['POST'], endpoint='process_purchases_import_route')
+def process_purchases_import():
     file_path = request.form.get('file_path')
     date_format = request.form.get('date_format')
     create_missing = request.form.get('create_missing') == 'yes'
