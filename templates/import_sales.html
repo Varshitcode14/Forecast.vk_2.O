@@ -1,9 +1,19 @@
 {% extends "base.html" %}
 
-{% block title %}Import Sales Data - Forecast.vk{% endblock %}
+{% block title %}Import Sales Data - KKK Enterprises{% endblock %}
 
 {% block content %}
 <section class="page-header">
+<!-- Loading Overlay -->
+<div class="loading-container" id="loading-overlay">
+  <div class="dot-wave">
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+  </div>
+  <div class="loading-text">Processing your data...</div>
+</div>
 <h2>Import Sales Data</h2>
 <p>Upload Excel files to import sales records</p>
 </section>
@@ -287,6 +297,16 @@
 </div>
 {% endif %}
 </div>
+</div>
+
+<div class="loading-container" id="loading-overlay">
+  <div class="dot-wave">
+    <span class="dot"></span>
+    <span class="dot"></span>
+    <span class="dot"></span>
+    <span class="dot"></span>
+  </div>
+  <div class="loading-text">Processing...</div>
 </div>
 {% endblock %}
 
@@ -644,6 +664,68 @@ color: #dc3545;
   margin: 0 0 1rem 0;
 }
 }
+
+/* Loading Animation Styles */
+.loading-container {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+}
+
+.loading-container.active {
+  display: flex;
+}
+
+.loading-text {
+  color: var(--secondary-color);
+  margin-top: 20px;
+  font-size: 1.2rem;
+}
+
+.dot-wave {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.dot-wave .dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin: 0 5px;
+  background-color: var(--accent-color);
+  animation: dot-wave 1.5s infinite ease-in-out;
+}
+
+.dot-wave .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.dot-wave .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.dot-wave .dot:nth-child(4) {
+  animation-delay: 0.6s;
+}
+
+@keyframes dot-wave {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
 </style>
 {% endblock %}
 
@@ -656,6 +738,10 @@ const fileInput = document.getElementById('file-input');
 const filePrompt = document.querySelector('.file-prompt');
 const fileName = document.querySelector('.file-name');
 const uploadBtn = document.getElementById('upload-btn');
+const uploadForm = document.getElementById('upload-form');
+const dateFormatForm = document.getElementById('date-format-form');
+const importForm = document.getElementById('import-form');
+const loadingOverlay = document.getElementById('loading-overlay');
 
 if (dropArea) {
   // Prevent default drag behaviors
@@ -667,10 +753,6 @@ if (dropArea) {
   // Highlight drop area when item is dragged over it
   ['dragenter', 'dragover'].forEach(eventName => {
     dropArea.addEventListener(eventName, highlight, false);
-  });
-  
-  ['dragleave', 'drop'].forEach(eventName => {
-    dropArea.addEventListener(eventName, unhighlight, false);
   });
   
   // Handle dropped files
@@ -687,10 +769,6 @@ function preventDefaults(e) {
 
 function highlight() {
   dropArea.classList.add('dragover');
-}
-
-function unhighlight() {
-  dropArea.classList.remove('dragover');
 }
 
 function handleDrop(e) {
@@ -730,6 +808,55 @@ function validateFileType(file) {
     fileName.style.display = 'none';
     uploadBtn.disabled = true;
   }
+}
+
+// Show loading overlay when forms are submitted
+document.addEventListener('DOMContentLoaded', function() {
+  const uploadForm = document.getElementById('upload-form');
+  const dateFormatForm = document.getElementById('date-format-form');
+  const importForm = document.getElementById('import-form');
+  const loadingOverlay = document.getElementById('loading-overlay');
+
+  if (uploadForm) {
+    uploadForm.addEventListener('submit', function() {
+      loadingOverlay.classList.add('active');
+    });
+  }
+
+  if (dateFormatForm) {
+    dateFormatForm.addEventListener('submit', function() {
+      loadingOverlay.classList.add('active');
+    });
+  }
+
+  if (importForm) {
+    importForm.addEventListener('submit', function() {
+      loadingOverlay.classList.add('active');
+    });
+  }
+});
+
+// Form submission handling with loading overlay
+if (uploadForm) {
+  uploadForm.addEventListener('submit', function() {
+    showLoadingOverlay();
+  });
+}
+
+if (dateFormatForm) {
+  dateFormatForm.addEventListener('submit', function() {
+    showLoadingOverlay();
+  });
+}
+
+if (importForm) {
+  importForm.addEventListener('submit', function() {
+    showLoadingOverlay();
+  });
+}
+
+function showLoadingOverlay() {
+  loadingOverlay.classList.add('active');
 }
 });
 

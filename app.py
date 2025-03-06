@@ -10,29 +10,93 @@ import pytz
 from import_routes import import_bp
 from functools import wraps
 import time
-from sqlalchemy import create_engine
-from sqlalchemy.pool import QueuePool
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
 
-# Use the provided PostgreSQL URL
-database_url = "postgresql://forecast_vk_2_0_user:ShNUFtmifpJMpDeBwQ5RA5lg90qcNonG@dpg-cv4i8aogph6c7390jsug-a.oregon-postgres.render.com/forecast_vk_2_0"
+# Replace the database configuration section with this:
 
-# Configure SQLAlchemy with proper SSL and connection pool settings
+# Use PostgreSQL database for Render deployment
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'production-key-for-deployment')
+database_url = "postgresql://forecast_vk_2_0_user:ShNUFtmifpJMpDeBwQ5RA5lg90qcNonG@dpg-cv4i8aogph6c7390jsug-a.oregon-postgres.render.com/forecast_vk_2_0"
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_size': 10,
+    'pool_size': 5,
+    'max_overflow': 10,
+    'pool_timeout': 30,
     'pool_recycle': 60,
     'pool_pre_ping': True,
     'connect_args': {
-        'sslmode': 'require',
-        'connect_timeout': 30
+        'connect_timeout': 10,
+        'application_name': 'forecast_vk_app'
     }
 }
 
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Initialize the database
 db.init_app(app)
+
+# Define IST timezone
+IST = pytz.timezone('Asia/Kolkata')
+
+# Helper function to get current time in IST
+def get_current_time_ist():
+    return datetime.now(pytz.utc).astimezone(IST)
+
+# Function to create admin user with better error handling
+def create_admin_user():
+    try:
+        # Check if admin user exists
+        admin_email = "forecastai007@gmail.com"
+        admin = User.query.filter_by(email=admin_email).first()
+        
+        if not admin:
+            # Create admin user
+            admin = User(
+                name="admin_Varshit_k",
+                email=admin_email,
+                is_admin=True
+            )
+            admin.set_password("Forecast@007")
+            db.session.add(admin)
+            db.session.commit()
+            logger.info("Admin user created successfully")
+            return True
+        elif not admin.is_admin:
+            # Update existing user to be admin
+            admin.is_admin = True
+            db.session.commit()
+            logger.info("User updated to admin status")
+            return True
+        else:
+            logger.info("Admin user already exists")
+            return True
+    except Exception as e:
+        logger.error(f"Error creating admin user: {str(e)}")
+        db.session.rollback()
+        return False
+
+# Create tables and initialize admin user with better error handling
+with app.app_context():
+    try:
+        db.create_all()
+        logger.info("Database tables created successfully")
+        
+        # Create admin user and log the result
+        admin_created = create_admin_user()
+        if admin_created:
+            logger.info("Admin user setup completed successfully")
+        else:
+            logger.warning("Admin user setup failed")
+            
+    except Exception as e:
+        logger.error(f"Error initializing database: {str(e)}")
 
 # Register the import blueprint
 app.register_blueprint(import_bp)
@@ -42,57 +106,13 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# Define IST timezone
-IST = pytz.timezone('Asia/Kolkata')
-
-# Helper function to get current time in IST
-def get_current_time_ist():
-    return datetime.now(pytz.utc).astimezone(IST)
-
-# Database connection retry decorator
-def db_retry(max_retries=3, retry_delay=1):
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            retries = 0
-            while retries < max_retries:
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    retries += 1
-                    if retries >= max_retries:
-                        raise
-                    print(f"Database operation failed, retrying ({retries}/{max_retries}): {str(e)}")
-                    time.sleep(retry_delay)
-        return wrapper
-    return decorator
-
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
-
-# Function to create admin user
-def create_admin_user():
-    # Check if admin user exists
-    admin_email = "forecastai007@gmail.com"
-    admin = User.query.filter_by(email=admin_email).first()
-    
-    if not admin:
-        # Create admin user
-        admin = User(
-            name="admin_Varshit_k",
-            email=admin_email,
-            is_admin=True
-        )
-        admin.set_password("Forecast@007")
-        db.session.add(admin)
-        db.session.commit()
-        print("Admin user created successfully")
-    elif not admin.is_admin:
-        # Update existing user to be admin
-        admin.is_admin = True
-        db.session.commit()
-        print("User updated to admin status")
+    try:
+        return User.query.get(int(user_id))
+    except Exception as e:
+        logger.error(f"Error loading user: {str(e)}")
+        return None
 
 # Add this decorator function to check if user is admin
 def admin_required(f):
@@ -121,51 +141,81 @@ def regular_user_required(f):
 def landing():
     return render_template('landing.html')
 
+# Update the signup route with better error handling
+
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
-        name = request.form.get('name')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')
-        
-        # Validate form data
-        if not name or not email or not password or not confirm_password:
-            flash('All fields are required', 'error')
+        try:
+            name = request.form.get('name')
+            email = request.form.get('email')
+            password = request.form.get('password')
+            confirm_password = request.form.get('confirm_password')
+            
+            # Log the signup attempt
+            logger.info(f"Signup attempt for email: {email}")
+            
+            # Validate form data
+            if not name or not email or not password or not confirm_password:
+                flash('All fields are required', 'error')
+                return redirect(url_for('signup'))
+                
+            if password != confirm_password:
+                flash('Passwords do not match', 'error')
+                return redirect(url_for('signup'))
+                
+            # Check if user already exists
+            existing_user = User.query.filter_by(email=email).first()
+            if existing_user:
+                flash('Email already registered', 'error')
+                return redirect(url_for('signup'))
+                
+            # Create new user
+            new_user = User(name=name, email=email)
+            new_user.set_password(password)
+            
+            db.session.add(new_user)
+            db.session.commit()
+            
+            logger.info(f"User created successfully: {email}")
+            flash('Account created successfully! Please log in.', 'success')
+            return redirect(url_for('login'))
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error in signup: {str(e)}")
+            flash('An error occurred during signup. Please try again.', 'error')
             return redirect(url_for('signup'))
             
-        if password != confirm_password:
-            flash('Passwords do not match', 'error')
-            return redirect(url_for('signup'))
-            
-        # Check if user already exists
-        existing_user = User.query.filter_by(email=email).first()
-        if existing_user:
-            flash('Email already registered', 'error')
-            return redirect(url_for('signup'))
-            
-        # Create new user
-        new_user = User(name=name, email=email)
-        new_user.set_password(password)
-        
-        db.session.add(new_user)
-        db.session.commit()
-        
-        flash('Account created successfully! Please log in.', 'success')
-        return redirect(url_for('login'))
-        
     return render_template('signup.html')
+
+# Update the login route with better error handling and debugging
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
-        
-        user = User.query.filter_by(email=email).first()
-        
-        if user and user.check_password(password):
+        try:
+            email = request.form.get('email')
+            password = request.form.get('password')
+            
+            logger.info(f"Login attempt for email: {email}")
+            
+            user = User.query.filter_by(email=email).first()
+            
+            if not user:
+                logger.warning(f"Login failed: No user found with email {email}")
+                flash('Invalid email or password', 'error')
+                return render_template('login.html')
+                
+            if not user.check_password(password):
+                logger.warning(f"Login failed: Incorrect password for {email}")
+                flash('Invalid email or password', 'error')
+                return render_template('login.html')
+            
+            # If we get here, login is successful
             login_user(user)
+            
+            # Log successful login
+            logger.info(f"User logged in successfully: {email}, is_admin: {user.is_admin}")
             
             # Redirect admin users to admin dashboard
             if user.is_admin:
@@ -174,8 +224,10 @@ def login():
             else:
                 flash('Logged in successfully!', 'success')
                 return redirect(url_for('home'))
-        else:
-            flash('Invalid email or password', 'error')
+                
+        except Exception as e:
+            logger.error(f"Error in login: {str(e)}")
+            flash('An error occurred during login. Please try again.', 'error')
             
     return render_template('login.html')
 
@@ -195,57 +247,52 @@ def home():
 # Function to generate daily report
 def generate_daily_report():
     with app.app_context():
-        # Get today's date in IST
-        today = get_current_time_ist().date()
-        
-        # Get sales and purchases for today
-        sales = Sale.query.filter(
-            Sale.sale_date >= today,
-            Sale.sale_date < today + timedelta(days=1)
-        ).all()
-        
-        purchases = Purchase.query.filter(
-            Purchase.purchase_date >= today,
-            Purchase.purchase_date < today + timedelta(days=1)
-        ).all()
-        
-        # Calculate totals
-        total_sales = sum(sale.total_amount for sale in sales)
-        total_purchases = sum(purchase.total_amount for purchase in purchases)
-        net_profit = total_sales - total_purchases
-        profit_margin = (net_profit / total_sales * 100) if total_sales > 0 else 0
-        
-        # Check inventory status
-        products = Product.query.all()
-        low_stock_count = sum(1 for p in products if p.quantity > 0 and p.quantity <= 10)
-        out_of_stock_count = sum(1 for p in products if p.quantity <= 0)
-        
-        # Create a new report object
-        report = Report(
-            report_type='daily',
-            start_date=today,
-            end_date=today,
-            total_sales=total_sales,
-            total_purchases=total_purchases,
-            net_profit=net_profit,
-            profit_margin=profit_margin,
-            low_stock_count=low_stock_count,
-            out_of_stock_count=out_of_stock_count
-        )
-        
-        db.session.add(report)
-        db.session.commit()
-        
-        print(f"Daily Report Generated for {today}")
-        print(f"Total Sales: ₹{total_sales}")
-        print(f"Total Purchases: ₹{total_purchases}")
-        print(f"Net Profit: ₹{net_profit}")
-        print(f"Profit Margin: {profit_margin:.1f}%")
-        print(f"Low Stock Items: {low_stock_count}")
-        print(f"Out of Stock Items: {out_of_stock_count}")
-        
-        # Create a notification for the report
-        print("Notification created: Daily business report is now available")
+        try:
+            # Get today's date in IST
+            today = get_current_time_ist().date()
+            
+            # Get sales and purchases for today
+            sales = Sale.query.filter(
+                Sale.sale_date >= today,
+                Sale.sale_date < today + timedelta(days=1)
+            ).all()
+            
+            purchases = Purchase.query.filter(
+                Purchase.purchase_date >= today,
+                Purchase.purchase_date < today + timedelta(days=1)
+            ).all()
+            
+            # Calculate totals
+            total_sales = sum(sale.total_amount for sale in sales)
+            total_purchases = sum(purchase.total_amount for purchase in purchases)
+            net_profit = total_sales - total_purchases
+            profit_margin = (net_profit / total_sales * 100) if total_sales > 0 else 0
+            
+            # Check inventory status
+            products = Product.query.all()
+            low_stock_count = sum(1 for p in products if p.quantity > 0 and p.quantity <= 10)
+            out_of_stock_count = sum(1 for p in products if p.quantity <= 0)
+            
+            # Create a new report object
+            report = Report(
+                report_type='daily',
+                start_date=today,
+                end_date=today,
+                total_sales=total_sales,
+                total_purchases=total_purchases,
+                net_profit=net_profit,
+                profit_margin=profit_margin,
+                low_stock_count=low_stock_count,
+                out_of_stock_count=out_of_stock_count
+            )
+            
+            db.session.add(report)
+            db.session.commit()
+            
+            logger.info(f"Daily Report Generated for {today}")
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error generating daily report: {str(e)}")
 
 @app.route('/insights')
 @login_required
@@ -263,36 +310,61 @@ def forecast_reports():
 @login_required
 @regular_user_required
 def stock():
-    products = Product.query.all()
-    return render_template('stock.html', products=products)
+    try:
+        products = Product.query.all()
+        return render_template('stock.html', products=products)
+    except Exception as e:
+        logger.error(f"Error in stock route: {str(e)}")
+        flash('Error loading stock data. Please try again.', 'error')
+        return redirect(url_for('home'))
 
 @app.route('/sales')
 @login_required
 @regular_user_required
 def sales():
-    sales = Sale.query.order_by(Sale.sale_date.desc()).all()
-    return render_template('sales.html', sales=sales)
+    try:
+        sales = Sale.query.order_by(Sale.sale_date.desc()).all()
+        return render_template('sales.html', sales=sales)
+    except Exception as e:
+        logger.error(f"Error in sales route: {str(e)}")
+        flash('Error loading sales data. Please try again.', 'error')
+        return redirect(url_for('home'))
 
 @app.route('/purchases')
 @login_required
 @regular_user_required
 def purchases():
-    purchases = Purchase.query.order_by(Purchase.purchase_date.desc()).all()
-    return render_template('purchases.html', purchases=purchases)
+    try:
+        purchases = Purchase.query.order_by(Purchase.purchase_date.desc()).all()
+        return render_template('purchases.html', purchases=purchases)
+    except Exception as e:
+        logger.error(f"Error in purchases route: {str(e)}")
+        flash('Error loading purchases data. Please try again.', 'error')
+        return redirect(url_for('home'))
 
 @app.route('/customers')
 @login_required
 @regular_user_required
 def customers():
-    customers = Customer.query.all()
-    return render_template('customers.html', customers=customers)
+    try:
+        customers = Customer.query.all()
+        return render_template('customers.html', customers=customers)
+    except Exception as e:
+        logger.error(f"Error in customers route: {str(e)}")
+        flash('Error loading customer data. Please try again.', 'error')
+        return redirect(url_for('home'))
 
 @app.route('/vendors')
 @login_required
 @regular_user_required
 def vendors():
-    vendors = Vendor.query.all()
-    return render_template('vendors.html', vendors=vendors)
+    try:
+        vendors = Vendor.query.all()
+        return render_template('vendors.html', vendors=vendors)
+    except Exception as e:
+        logger.error(f"Error in vendors route: {str(e)}")
+        flash('Error loading vendor data. Please try again.', 'error')
+        return redirect(url_for('home'))
 
 @app.route('/notifications')
 @login_required
@@ -317,242 +389,304 @@ def import_data():
 @app.route('/api/customers', methods=['GET'])
 @login_required
 def get_customers():
-    customers = Customer.query.all()
-    return jsonify([customer.to_dict() for customer in customers])
+    try:
+        customers = Customer.query.all()
+        return jsonify([customer.to_dict() for customer in customers])
+    except Exception as e:
+        logger.error(f"Error in get_customers: {str(e)}")
+        return jsonify({'error': 'Failed to fetch customers'}), 500
 
 @app.route('/api/customers', methods=['POST'])
 @login_required
 def add_customer():
-    data = request.json
+    try:
+        data = request.json
 
-    # Check if customer with GST ID already exists
-    existing_customer = Customer.query.filter_by(gst_id=data['gst_id']).first()
-    if existing_customer:
-        return jsonify({'success': False, 'message': 'Customer with this GST ID already exists'}), 400
+        # Check if customer with GST ID already exists
+        existing_customer = Customer.query.filter_by(gst_id=data['gst_id']).first()
+        if existing_customer:
+            return jsonify({'success': False, 'message': 'Customer with this GST ID already exists'}), 400
 
-    customer = Customer(
-        gst_id=data['gst_id'],
-        name=data['name'],
-        contact_person=data.get('contact_person', ''),
-        phone=data.get('phone', ''),
-        location=data['location'],
-        about=data.get('about', '')
-    )
+        customer = Customer(
+            gst_id=data['gst_id'],
+            name=data['name'],
+            contact_person=data.get('contact_person', ''),
+            phone=data.get('phone', ''),
+            location=data['location'],
+            about=data.get('about', '')
+        )
 
-    db.session.add(customer)
-    db.session.commit()
+        db.session.add(customer)
+        db.session.commit()
 
-    return jsonify({'success': True, 'customer': customer.to_dict()}), 201
+        return jsonify({'success': True, 'customer': customer.to_dict()}), 201
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error in add_customer: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while adding the customer'}), 500
 
 @app.route('/api/customers/<int:id>', methods=['PUT'])
 @login_required
 def update_customer(id):
-    customer = Customer.query.get_or_404(id)
-    data = request.json
+    try:
+        customer = Customer.query.get_or_404(id)
+        data = request.json
 
-    customer.name = data.get('name', customer.name)
-    customer.contact_person = data.get('contact_person', customer.contact_person)
-    customer.phone = data.get('phone', customer.phone)
-    customer.location = data.get('location', customer.location)
-    customer.about = data.get('about', customer.about)
+        customer.name = data.get('name', customer.name)
+        customer.contact_person = data.get('contact_person', customer.contact_person)
+        customer.phone = data.get('phone', customer.phone)
+        customer.location = data.get('location', customer.location)
+        customer.about = data.get('about', customer.about)
 
-    db.session.commit()
+        db.session.commit()
 
-    return jsonify({'success': True, 'customer': customer.to_dict()})
+        return jsonify({'success': True, 'customer': customer.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error in update_customer: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while updating the customer'}), 500
 
 @app.route('/api/customers/<int:id>', methods=['DELETE'])
 @login_required
 def delete_customer(id):
-    customer = Customer.query.get_or_404(id)
+    try:
+        customer = Customer.query.get_or_404(id)
 
-    # Check if customer has sales
-    if customer.sales:
-        return jsonify({'success': False, 'message': 'Cannot delete customer with sales records'}), 400
+        # Check if customer has sales
+        if customer.sales:
+            return jsonify({'success': False, 'message': 'Cannot delete customer with sales records'}), 400
 
-    db.session.delete(customer)
-    db.session.commit()
+        db.session.delete(customer)
+        db.session.commit()
 
-    return jsonify({'success': True}), 200
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error in delete_customer: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while deleting the customer'}), 500
 
 # Vendor API endpoints
 @app.route('/api/vendors', methods=['GET'])
 @login_required
 def get_vendors():
-    vendors = Vendor.query.all()
-    return jsonify([vendor.to_dict() for vendor in vendors])
+    try:
+        vendors = Vendor.query.all()
+        return jsonify([vendor.to_dict() for vendor in vendors])
+    except Exception as e:
+        logger.error(f"Error in get_vendors: {str(e)}")
+        return jsonify({'error': 'Failed to fetch vendors'}), 500
 
 @app.route('/api/vendors', methods=['POST'])
 @login_required
 def add_vendor():
-    data = request.json
+    try:
+        data = request.json
 
-    # Check if vendor with GST ID already exists
-    existing_vendor = Vendor.query.filter_by(gst_id=data['gst_id']).first()
-    if existing_vendor:
-        return jsonify({'success': False, 'message': 'Vendor with this GST ID already exists'}), 400
+        # Check if vendor with GST ID already exists
+        existing_vendor = Vendor.query.filter_by(gst_id=data['gst_id']).first()
+        if existing_vendor:
+            return jsonify({'success': False, 'message': 'Vendor with this GST ID already exists'}), 400
 
-    vendor = Vendor(
-        gst_id=data['gst_id'],
-        name=data['name'],
-        contact_person=data.get('contact_person', ''),
-        phone=data.get('phone', ''),
-        location=data['location'],
-        about=data.get('about', '')
-    )
+        vendor = Vendor(
+            gst_id=data['gst_id'],
+            name=data['name'],
+            contact_person=data.get('contact_person', ''),
+            phone=data.get('phone', ''),
+            location=data['location'],
+            about=data.get('about', '')
+        )
 
-    db.session.add(vendor)
-    db.session.commit()
+        db.session.add(vendor)
+        db.session.commit()
 
-    return jsonify({'success': True, 'vendor': vendor.to_dict()}), 201
+        return jsonify({'success': True, 'vendor': vendor.to_dict()}), 201
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error in add_vendor: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while adding the vendor'}), 500
 
 @app.route('/api/vendors/<int:id>', methods=['PUT'])
 @login_required
 def update_vendor(id):
-    vendor = Vendor.query.get_or_404(id)
-    data = request.json
+    try:
+        vendor = Vendor.query.get_or_404(id)
+        data = request.json
 
-    vendor.name = data.get('name', vendor.name)
-    vendor.contact_person = data.get('contact_person', vendor.contact_person)
-    vendor.phone = data.get('phone', vendor.phone)
-    vendor.location = data.get('location', vendor.location)
-    vendor.about = data.get('about', vendor.about)
+        vendor.name = data.get('name', vendor.name)
+        vendor.contact_person = data.get('contact_person', vendor.contact_person)
+        vendor.phone = data.get('phone', vendor.phone)
+        vendor.location = data.get('location', vendor.location)
+        vendor.about = data.get('about', vendor.about)
 
-    db.session.commit()
+        db.session.commit()
 
-    return jsonify({'success': True, 'vendor': vendor.to_dict()})
+        return jsonify({'success': True, 'vendor': vendor.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error in update_vendor: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while updating the vendor'}), 500
 
 @app.route('/api/vendors/<int:id>', methods=['DELETE'])
 @login_required
 def delete_vendor(id):
-    vendor = Vendor.query.get_or_404(id)
+    try:
+        vendor = Vendor.query.get_or_404(id)
 
-    # Check if vendor has purchases
-    if vendor.purchases:
-        return jsonify({'success': False, 'message': 'Cannot delete vendor with purchase records'}), 400
+        # Check if vendor has purchases
+        if vendor.purchases:
+            return jsonify({'success': False, 'message': 'Cannot delete vendor with purchase records'}), 400
 
-    db.session.delete(vendor)
-    db.session.commit()
+        db.session.delete(vendor)
+        db.session.commit()
 
-    return jsonify({'success': True}), 200
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error in delete_vendor: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while deleting the vendor'}), 500
 
 # Product API endpoints
 @app.route('/api/products', methods=['GET'])
 @login_required
 def get_products():
-    products = Product.query.all()
-    return jsonify([product.to_dict() for product in products])
+    try:
+        products = Product.query.all()
+        return jsonify([product.to_dict() for product in products])
+    except Exception as e:
+        logger.error(f"Error in get_products: {str(e)}")
+        return jsonify({'error': 'Failed to fetch products'}), 500
 
 @app.route('/api/products', methods=['POST'])
 @login_required
 def add_product():
-    data = request.json
+    try:
+        data = request.json
 
-    # Check if product with product ID already exists
-    existing_product = Product.query.filter_by(product_id=data['product_id']).first()
-    if existing_product:
-        return jsonify({'success': False, 'message': 'Product with this ID already exists'}), 400
+        # Check if product with product ID already exists
+        existing_product = Product.query.filter_by(product_id=data['product_id']).first()
+        if existing_product:
+            return jsonify({'success': False, 'message': 'Product with this ID already exists'}), 400
 
-    product = Product(
-        product_id=data['product_id'],
-        name=data['name'],
-        quantity=data['quantity'],
-        cost_per_unit=data['cost_per_unit'],
-        specifications=data.get('specifications', '')
-    )
+        product = Product(
+            product_id=data['product_id'],
+            name=data['name'],
+            quantity=data['quantity'],
+            cost_per_unit=data['cost_per_unit'],
+            specifications=data.get('specifications', '')
+        )
 
-    db.session.add(product)
-    db.session.commit()
+        db.session.add(product)
+        db.session.commit()
 
-    return jsonify({'success': True, 'product': product.to_dict()}), 201
+        return jsonify({'success': True, 'product': product.to_dict()}), 201
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error in add_product: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while adding the product'}), 500
 
 @app.route('/api/products/<int:id>', methods=['PUT'])
 @login_required
 def update_product(id):
-    product = Product.query.get_or_404(id)
-    data = request.json
+    try:
+        product = Product.query.get_or_404(id)
+        data = request.json
 
-    product.name = data.get('name', product.name)
-    product.quantity = data.get('quantity', product.quantity)
-    product.cost_per_unit = data.get('cost_per_unit', product.cost_per_unit)
-    product.specifications = data.get('specifications', product.specifications)
+        product.name = data.get('name', product.name)
+        product.quantity = data.get('quantity', product.quantity)
+        product.cost_per_unit = data.get('cost_per_unit', product.cost_per_unit)
+        product.specifications = data.get('specifications', product.specifications)
 
-    db.session.commit()
+        db.session.commit()
 
-    return jsonify({'success': True, 'product': product.to_dict()})
+        return jsonify({'success': True, 'product': product.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error in update_product: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while updating the product'}), 500
 
 @app.route('/api/products/<int:id>', methods=['DELETE'])
 @login_required
 def delete_product(id):
-    product = Product.query.get_or_404(id)
+    try:
+        product = Product.query.get_or_404(id)
 
-    # Check if product has sale items or purchase items
-    if product.sale_items or product.purchase_items:
-        return jsonify({'success': False, 'message': 'Cannot delete product with sales or purchase records'}), 400
+        # Check if product has sale items or purchase items
+        if product.sale_items or product.purchase_items:
+            return jsonify({'success': False, 'message': 'Cannot delete product with sales or purchase records'}), 400
 
-    db.session.delete(product)
-    db.session.commit()
+        db.session.delete(product)
+        db.session.commit()
 
-    return jsonify({'success': True}), 200
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error in delete_product: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while deleting the product'}), 500
 
 # Sales API endpoints
 @app.route('/api/sales', methods=['POST'])
 @login_required
 def add_sale():
-    data = request.json
+    try:
+        data = request.json
 
-    # Get customer
-    customer = Customer.query.get(data['customer_id'])
-    if not customer:
-        return jsonify({'success': False, 'message': 'Customer not found'}), 404
+        # Get customer
+        customer = Customer.query.get(data['customer_id'])
+        if not customer:
+            return jsonify({'success': False, 'message': 'Customer not found'}), 404
 
-    # Create sale with IST time
-    sale = Sale(
-        customer_id=customer.id,
-        delivery_charges=data['delivery_charges'],
-        total_amount=data['total_amount'],
-        sale_date=get_current_time_ist()
-    )
-
-    db.session.add(sale)
-
-    # Add sale items
-    for item_data in data['items']:
-        product = Product.query.get(item_data['product_id'])
-        if not product:
-            db.session.rollback()
-            return jsonify({'success': False, 'message': f'Product not found: {item_data["product_id"]}'}), 404
-        
-        # Check if enough stock
-        if product.quantity < item_data['quantity']:
-            db.session.rollback()
-            return jsonify({'success': False, 'message': f'Not enough stock for product: {product.name}'}), 400
-        
-        # Update product quantity
-        product.quantity -= item_data['quantity']
-        
-        # Create sale item
-        sale_item = SaleItem(
-            sale=sale,
-            product_id=product.id,
-            quantity=item_data['quantity'],
-            gst_percentage=item_data['gst_percentage'],
-            discount_percentage=item_data['discount_percentage'],
-            unit_price=product.cost_per_unit,
-            total_price=item_data['total_price']
+        # Create sale with IST time
+        sale = Sale(
+            customer_id=customer.id,
+            delivery_charges=data['delivery_charges'],
+            total_amount=data['total_amount'],
+            sale_date=get_current_time_ist()
         )
-        
-        db.session.add(sale_item)
 
-    db.session.commit()
+        db.session.add(sale)
 
-    return jsonify({'success': True, 'sale_id': sale.id}), 201
+        # Add sale items
+        for item_data in data['items']:
+            product = Product.query.get(item_data['product_id'])
+            if not product:
+                db.session.rollback()
+                return jsonify({'success': False, 'message': f'Product not found: {item_data["product_id"]}'}), 404
+            
+            # Check if enough stock
+            if product.quantity < item_data['quantity']:
+                db.session.rollback()
+                return jsonify({'success': False, 'message': f'Not enough stock for product: {product.name}'}), 400
+            
+            # Update product quantity
+            product.quantity -= item_data['quantity']
+            
+            # Create sale item
+            sale_item = SaleItem(
+                sale=sale,
+                product_id=product.id,
+                quantity=item_data['quantity'],
+                gst_percentage=item_data['gst_percentage'],
+                discount_percentage=item_data['discount_percentage'],
+                unit_price=item_data.get('unit_price', product.cost_per_unit),  # Use provided unit price or default to product cost
+                total_price=item_data['total_price']
+            )
+            
+            db.session.add(sale_item)
+
+        db.session.commit()
+
+        return jsonify({'success': True, 'sale_id': sale.id}), 201
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error in add_sale: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while adding the sale'}), 500
 
 @app.route('/api/sales', methods=['GET'])
 @login_required
 def get_sales():
     try:
         sales = Sale.query.all()
-        print(f"Fetched {len(sales)} sales records from database")
+        logger.info(f"Fetched {len(sales)} sales records from database")
         result = []
 
         for sale in sales:
@@ -583,18 +717,18 @@ def get_sales():
             
             result.append(sale_data)
 
-        print(f"Returning {len(result)} formatted sales records")
+        logger.info(f"Returning {len(result)} formatted sales records")
         return jsonify(result)
     except Exception as e:
-        print(f"Error in get_sales: {str(e)}")
-        return jsonify([])
+        logger.error(f"Error in get_sales: {str(e)}")
+        return jsonify({'error': 'Failed to fetch sales'}), 500
 
 @app.route('/api/sales/<int:id>', methods=['DELETE'])
 @login_required
 def delete_sale(id):
-    sale = Sale.query.get_or_404(id)
-    
     try:
+        sale = Sale.query.get_or_404(id)
+        
         # First, restore product quantities
         for item in sale.items:
             product = item.product
@@ -611,131 +745,146 @@ def delete_sale(id):
         return jsonify({'success': True}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        logger.error(f"Error in delete_sale: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while deleting the sale'}), 500
 
 # Purchases API endpoints
 @app.route('/api/purchases', methods=['POST'])
 @login_required
 def add_purchase():
-    data = request.json
+    try:
+        data = request.json
 
-    # Get vendor
-    vendor = Vendor.query.get(data['vendor_id'])
-    if not vendor:
-        return jsonify({'success': False, 'message': 'Vendor not found'}), 404
+        # Get vendor
+        vendor = Vendor.query.get(data['vendor_id'])
+        if not vendor:
+            return jsonify({'success': False, 'message': 'Vendor not found'}), 404
 
-    # Create purchase with IST time
-    purchase = Purchase(
-        vendor_id=vendor.id,
-        order_id=data['order_id'],
-        delivery_charges=data['delivery_charges'],
-        total_amount=data['total_amount'],
-        status=data['status'],
-        purchase_date=get_current_time_ist()
-    )
-
-    if 'purchase_date' in data:
-        purchase_date = datetime.strptime(data['purchase_date'], '%Y-%m-%d')
-        purchase.purchase_date = IST.localize(purchase_date)
-
-    db.session.add(purchase)
-
-    # Add purchase items
-    for item_data in data['items']:
-        product = Product.query.get(item_data['product_id'])
-        if not product:
-            db.session.rollback()
-            return jsonify({'success': False, 'message': f'Product not found: {item_data["product_id"]}'}), 404
-        
-        # Create purchase item
-        purchase_item = PurchaseItem(
-            purchase=purchase,
-            product_id=product.id,
-            quantity=item_data['quantity'],
-            gst_percentage=item_data['gst_percentage'],
-            unit_price=item_data['unit_price'],
-            total_price=item_data['total_price']
+        # Create purchase with IST time
+        purchase = Purchase(
+            vendor_id=vendor.id,
+            order_id=data['order_id'],
+            delivery_charges=data['delivery_charges'],
+            total_amount=data['total_amount'],
+            status=data['status'],
+            purchase_date=get_current_time_ist()
         )
-        
-        db.session.add(purchase_item)
-        
-        # Update product quantity if purchase is delivered
-        if data['status'] == 'Delivered':
-            product.quantity += item_data['quantity']
 
-    db.session.commit()
+        if 'purchase_date' in data:
+            purchase_date = datetime.strptime(data['purchase_date'], '%Y-%m-%d')
+            purchase.purchase_date = IST.localize(purchase_date)
 
-    return jsonify({'success': True, 'purchase_id': purchase.id}), 201
+        db.session.add(purchase)
+
+        # Add purchase items
+        for item_data in data['items']:
+            product = Product.query.get(item_data['product_id'])
+            if not product:
+                db.session.rollback()
+                return jsonify({'success': False, 'message': f'Product not found: {item_data["product_id"]}'}), 404
+            
+            # Create purchase item
+            purchase_item = PurchaseItem(
+                purchase=purchase,
+                product_id=product.id,
+                quantity=item_data['quantity'],
+                gst_percentage=item_data['gst_percentage'],
+                unit_price=item_data['unit_price'],
+                total_price=item_data['total_price']
+            )
+            
+            db.session.add(purchase_item)
+            
+            # Update product quantity if purchase is delivered
+            if data['status'] == 'Delivered':
+                product.quantity += item_data['quantity']
+
+        db.session.commit()
+
+        return jsonify({'success': True, 'purchase_id': purchase.id}), 201
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error in add_purchase: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while adding the purchase'}), 500
 
 @app.route('/api/purchases', methods=['GET'])
 @login_required
 def get_purchases():
-    purchases = Purchase.query.all()
-    result = []
+    try:
+        purchases = Purchase.query.all()
+        result = []
 
-    for purchase in purchases:
-        # Format date in IST
-        purchase_date_ist = purchase.purchase_date.astimezone(IST) if purchase.purchase_date.tzinfo else IST.localize(purchase.purchase_date)
-        
-        purchase_data = {
-            'id': purchase.id,
-            'vendor_name': purchase.vendor.name,
-            'vendor_gst_id': purchase.vendor.gst_id,
-            'order_id': purchase.order_id,
-            'purchase_date': purchase_date_ist.strftime('%Y-%m-%d'),
-            'delivery_charges': purchase.delivery_charges,
-            'total_amount': purchase.total_amount,
-            'status': purchase.status,
-            'items': []
-        }
-        
-        for item in purchase.items:
-            item_data = {
-                'product_name': item.product.name,
-                'product_id': item.product.product_id,
-                'quantity': item.quantity,
-                'gst_percentage': item.gst_percentage,
-                'unit_price': item.unit_price,
-                'total_price': item.total_price
+        for purchase in purchases:
+            # Format date in IST
+            purchase_date_ist = purchase.purchase_date.astimezone(IST) if purchase.purchase_date.tzinfo else IST.localize(purchase.purchase_date)
+            
+            purchase_data = {
+                'id': purchase.id,
+                'vendor_name': purchase.vendor.name,
+                'vendor_gst_id': purchase.vendor.gst_id,
+                'order_id': purchase.order_id,
+                'purchase_date': purchase_date_ist.strftime('%Y-%m-%d'),
+                'delivery_charges': purchase.delivery_charges,
+                'total_amount': purchase.total_amount,
+                'status': purchase.status,
+                'items': []
             }
-            purchase_data['items'].append(item_data)
-        
-        result.append(purchase_data)
+            
+            for item in purchase.items:
+                item_data = {
+                    'product_name': item.product.name,
+                    'product_id': item.product.product_id,
+                    'quantity': item.quantity,
+                    'gst_percentage': item.gst_percentage,
+                    'unit_price': item.unit_price,
+                    'total_price': item.total_price
+                }
+                purchase_data['items'].append(item_data)
+            
+            result.append(purchase_data)
 
-    return jsonify(result)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error in get_purchases: {str(e)}")
+        return jsonify({'error': 'Failed to fetch purchases'}), 500
 
 @app.route('/api/purchases/<int:id>', methods=['PUT'])
 @login_required
 def update_purchase_status(id):
-    purchase = Purchase.query.get_or_404(id)
-    data = request.json
+    try:
+        purchase = Purchase.query.get_or_404(id)
+        data = request.json
 
-    old_status = purchase.status
-    new_status = data.get('status', old_status)
+        old_status = purchase.status
+        new_status = data.get('status', old_status)
 
-    # If status is changing to Delivered, update product quantities
-    if old_status != 'Delivered' and new_status == 'Delivered':
-        for item in purchase.items:
-            item.product.quantity += item.quantity
+        # If status is changing to Delivered, update product quantities
+        if old_status != 'Delivered' and new_status == 'Delivered':
+            for item in purchase.items:
+                item.product.quantity += item.quantity
 
-    # If status is changing from Delivered to something else, reduce product quantities
-    if old_status == 'Delivered' and new_status != 'Delivered':
-        for item in purchase.items:
-            if item.product.quantity < item.quantity:
-                return jsonify({'success': False, 'message': f'Not enough stock for product: {item.product.name}'}), 400
-            item.product.quantity -= item.quantity
+        # If status is changing from Delivered to something else, reduce product quantities
+        if old_status == 'Delivered' and new_status != 'Delivered':
+            for item in purchase.items:
+                if item.product.quantity < item.quantity:
+                    return jsonify({'success': False, 'message': f'Not enough stock for product: {item.product.name}'}), 400
+                item.product.quantity -= item.quantity
 
-    purchase.status = new_status
-    db.session.commit()
+        purchase.status = new_status
+        db.session.commit()
 
-    return jsonify({'success': True})
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error in update_purchase_status: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while updating the purchase status'}), 500
 
 @app.route('/api/purchases/<int:id>', methods=['DELETE'])
 @login_required
 def delete_purchase(id):
-    purchase = Purchase.query.get_or_404(id)
-    
     try:
+        purchase = Purchase.query.get_or_404(id)
+        
         # If purchase is delivered, reduce product quantities
         if purchase.status == 'Delivered':
             for item in purchase.items:
@@ -755,38 +904,41 @@ def delete_purchase(id):
         return jsonify({'success': True}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        logger.error(f"Error in delete_purchase: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while deleting the purchase'}), 500
 
 # API endpoint for reports
 @app.route('/api/reports', methods=['GET'])
 @login_required
 def get_reports():
-    # Fetch reports from the database
-    reports = Report.query.order_by(Report.created_at.desc()).all()
-    return jsonify([report.to_dict() for report in reports])
+    try:
+        # Fetch reports from the database
+        reports = Report.query.order_by(Report.created_at.desc()).all()
+        return jsonify([report.to_dict() for report in reports])
+    except Exception as e:
+        logger.error(f"Error in get_reports: {str(e)}")
+        return jsonify({'error': 'Failed to fetch reports'}), 500
 
 @app.route('/api/reports', methods=['POST'])
 @login_required
 def add_report():
-    data = request.json
-
-    # In a real application, this would save the report to the database
-    # For this example, we'll just return success
-
-    return jsonify({'success': True, 'report_id': 4})
+    try:
+        data = request.json
+        # In a real application, this would save the report to the database
+        return jsonify({'success': True, 'report_id': 4})
+    except Exception as e:
+        logger.error(f"Error in add_report: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while adding the report'}), 500
 
 @app.route('/api/reports/<int:id>', methods=['GET'])
 @login_required
 def get_report(id):
-    report = Report.query.get_or_404(id)
-    return jsonify(report.to_dict())
-
-# Create tables when the app starts
-with app.app_context():
-    # Only create tables if they don't exist
-    # This won't delete existing data
-    db.create_all()
-    create_admin_user()  # Create admin user if it doesn't exist
+    try:
+        report = Report.query.get_or_404(id)
+        return jsonify(report.to_dict())
+    except Exception as e:
+        logger.error(f"Error in get_report: {str(e)}")
+        return jsonify({'error': 'Failed to fetch report'}), 500
 
 # Setup scheduler for daily reports
 try:
@@ -801,7 +953,7 @@ try:
     atexit.register(lambda: scheduler.shutdown())
 
 except ImportError:
-    print("APScheduler not installed. Daily reports will not be generated automatically.")
+    logger.warning("APScheduler not installed. Daily reports will not be generated automatically.")
 
 # Admin routes
 @app.route('/admin')
@@ -814,8 +966,21 @@ def admin_dashboard():
 @login_required
 @admin_required
 def get_admin_users():
-    users = User.query.all()
-    return jsonify([user.to_dict() for user in users])
+    try:
+        users = User.query.all()
+        return jsonify([user.to_dict() for user in users])
+    except Exception as e:
+        logger.error(f"Error in get_admin_users: {str(e)}")
+        return jsonify({'error': 'Failed to fetch users'}), 500
+
+# Error handlers
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('error.html', error="Page not found"), 404
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    return render_template('error.html', error="Internal server error"), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

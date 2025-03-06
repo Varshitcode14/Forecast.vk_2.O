@@ -1,9 +1,19 @@
 {% extends "base.html" %}
 
-{% block title %}Import Purchases Data - Forecast.vk{% endblock %}
+{% block title %}Import Purchases Data - KKK Enterprises{% endblock %}
 
 {% block content %}
 <section class="page-header">
+<!-- Loading Overlay -->
+<div class="loading-container" id="loading-overlay">
+  <div class="dot-wave">
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+  </div>
+  <div class="loading-text">Processing your data...</div>
+</div>
 <h2>Import Purchases Data</h2>
 <p>Upload Excel files to import purchase records</p>
 </section>
@@ -650,120 +660,209 @@ color: #dc3545;
   margin: 0 0 1rem 0;
 }
 }
+
+/* Loading Animation Styles */
+.loading-container {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+}
+
+.loading-container.active {
+  display: flex;
+}
+
+.loading-text {
+  color: var(--secondary-color);
+  margin-top: 20px;
+  font-size: 1.2rem;
+}
+
+.dot-wave {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.dot-wave .dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin: 0 5px;
+  background-color: var(--accent-color);
+  animation: dot-wave 1.5s infinite ease-in-out;
+}
+
+.dot-wave .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.dot-wave .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.dot-wave .dot:nth-child(4) {
+  animation-delay: 0.6s;
+}
+
+@keyframes dot-wave {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
 </style>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-// File upload handling
-const dropArea = document.getElementById('drop-area');
-const fileInput = document.getElementById('file-input');
-const filePrompt = document.querySelector('.file-prompt');
-const fileName = document.querySelector('.file-name');
-const uploadBtn = document.getElementById('upload-btn');
+  // File upload handling
+  const dropArea = document.getElementById('drop-area');
+  const fileInput = document.getElementById('file-input');
+  const filePrompt = document.querySelector('.file-prompt');
+  const fileName = document.querySelector('.file-name');
+  const uploadBtn = document.getElementById('upload-btn');
+  const loadingOverlay = document.getElementById('loading-overlay');
 
-if (dropArea) {
-  // Prevent default drag behaviors
-  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-    dropArea.addEventListener(eventName, preventDefaults, false);
-    document.body.addEventListener(eventName, preventDefaults, false);
-  });
-  
-  // Highlight drop area when item is dragged over it
-  ['dragenter', 'dragover'].forEach(eventName => {
-    dropArea.addEventListener(eventName, highlight, false);
-  });
-  
-  ['dragleave', 'drop'].forEach(eventName => {
-    dropArea.addEventListener(eventName, unhighlight, false);
-  });
-  
-  // Handle dropped files
-  dropArea.addEventListener('drop', handleDrop, false);
-  
-  // Handle selected files
-  fileInput.addEventListener('change', handleFiles, false);
-}
+  // Setup form submission handlers for loading animation
+  const uploadForm = document.getElementById('upload-form');
+  const dateFormatForm = document.getElementById('date-format-form');
+  const importForm = document.getElementById('import-form');
 
-function preventDefaults(e) {
-  e.preventDefault();
-  e.stopPropagation();
-}
-
-function highlight() {
-  dropArea.classList.add('dragover');
-}
-
-function unhighlight() {
-  dropArea.classList.remove('dragover');
-}
-
-function handleDrop(e) {
-  const dt = e.dataTransfer;
-  const files = dt.files;
-  
-  if (files.length) {
-    fileInput.files = files;
-    handleFiles();
+  if (uploadForm) {
+    uploadForm.addEventListener('submit', function() {
+      console.log('Upload form submitted, showing loading overlay');
+      loadingOverlay.classList.add('active');
+    });
   }
-}
 
-function handleFiles() {
-  if (fileInput.files.length) {
-    const file = fileInput.files[0];
-    displayFileName(file);
-    validateFileType(file);
+  if (dateFormatForm) {
+    dateFormatForm.addEventListener('submit', function() {
+      console.log('Date format form submitted, showing loading overlay');
+      loadingOverlay.classList.add('active');
+    });
   }
-}
 
-function displayFileName(file) {
-  filePrompt.style.display = 'none';
-  fileName.textContent = file.name;
-  fileName.style.display = 'block';
-}
-
-function validateFileType(file) {
-  const validExtensions = ['.xlsx', '.xls', '.csv'];
-  const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-  
-  if (validExtensions.includes(fileExtension)) {
-    uploadBtn.disabled = false;
-  } else {
-    alert('Please select a valid Excel (.xlsx, .xls) or CSV file.');
-    fileInput.value = '';
-    filePrompt.style.display = 'block';
-    fileName.style.display = 'none';
-    uploadBtn.disabled = true;
+  if (importForm) {
+    importForm.addEventListener('submit', function() {
+      console.log('Import form submitted, showing loading overlay');
+      loadingOverlay.classList.add('active');
+    });
   }
-}
+
+  if (dropArea) {
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, preventDefaults, false);
+      document.body.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    // Highlight drop area when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropArea.addEventListener(eventName, highlight, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, unhighlight, false);
+    });
+    
+    // Handle dropped files
+    dropArea.addEventListener('drop', handleDrop, false);
+    
+    // Handle selected files
+    fileInput.addEventListener('change', handleFiles, false);
+  }
+
+  function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function highlight() {
+    dropArea.classList.add('dragover');
+  }
+
+  function unhighlight() {
+    dropArea.classList.remove('dragover');
+  }
+
+  function handleDrop(e) {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    
+    if (files.length) {
+      fileInput.files = files;
+      handleFiles();
+    }
+  }
+
+  function handleFiles() {
+    if (fileInput.files.length) {
+      const file = fileInput.files[0];
+      displayFileName(file);
+      validateFileType(file);
+    }
+  }
+
+  function displayFileName(file) {
+    filePrompt.style.display = 'none';
+    fileName.textContent = file.name;
+    fileName.style.display = 'block';
+  }
+
+  function validateFileType(file) {
+    const validExtensions = ['.xlsx', '.xls', '.csv'];
+    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+    
+    if (validExtensions.includes(fileExtension)) {
+      uploadBtn.disabled = false;
+    } else {
+      alert('Please select a valid Excel (.xlsx, .xls) or CSV file.');
+      fileInput.value = '';
+      filePrompt.style.display = 'block';
+      fileName.style.display = 'none';
+      uploadBtn.disabled = true;
+    }
+  }
 });
 
 // Function to navigate between steps
 function goToStep(step) {
-// Hide all sections
-document.getElementById('upload-section').style.display = 'none';
-document.getElementById('date-format-section').style.display = 'none';
-document.getElementById('preview-section').style.display = 'none';
-document.getElementById('results-section').style.display = 'none';
+  // Hide all sections
+  document.getElementById('upload-section').style.display = 'none';
+  document.getElementById('date-format-section').style.display = 'none';
+  document.getElementById('preview-section').style.display = 'none';
+  document.getElementById('results-section').style.display = 'none';
 
-// Remove active class from all steps
-document.querySelectorAll('.workflow-step').forEach(s => s.classList.remove('active'));
+  // Remove active class from all steps
+  document.querySelectorAll('.workflow-step').forEach(s => s.classList.remove('active'));
 
-// Show selected section and mark step as active
-if (step === 1) {
-  document.getElementById('upload-section').style.display = 'block';
-  document.getElementById('step1').classList.add('active');
-} else if (step === 2) {
-  document.getElementById('date-format-section').style.display = 'block';
-  document.getElementById('step2').classList.add('active');
-} else if (step === 3) {
-  document.getElementById('preview-section').style.display = 'block';
-  document.getElementById('step3').classList.add('active');
-} else if (step === 4) {
-  document.getElementById('results-section').style.display = 'block';
-  document.getElementById('step4').classList.add('active');
-}
+  // Show selected section and mark step as active
+  if (step === 1) {
+    document.getElementById('upload-section').style.display = 'block';
+    document.getElementById('step1').classList.add('active');
+  } else if (step === 2) {
+    document.getElementById('date-format-section').style.display = 'block';
+    document.getElementById('step2').classList.add('active');
+  } else if (step === 3) {
+    document.getElementById('preview-section').style.display = 'block';
+    document.getElementById('step3').classList.add('active');
+  } else if (step === 4) {
+    document.getElementById('results-section').style.display = 'block';
+    document.getElementById('step4').classList.add('active');
+  }
 }
 </script>
 {% endblock %}
