@@ -172,9 +172,9 @@ def process_imports_worker():
     
     while import_thread_running:
         try:
-            # Get an import task from the queue with a timeout
+            # Get an import task from the queue with a shorter timeout
             try:
-                task = import_queue.get(timeout=5)
+                task = import_queue.get(timeout=1)  # Reduced timeout from 5 to 1 second
             except queue.Empty:
                 continue
             
@@ -184,10 +184,12 @@ def process_imports_worker():
             date_format = task['date_format']
             create_missing = task.get('create_missing', False)
             
-            # Update status to processing
+            logger.info(f"Starting import process for {import_id}")
+            
+            # Update status to processing immediately
             status_data = {
                 'status': 'processing',
-                'progress': 0,
+                'progress': 5,
                 'message': f"Starting {import_type} import...",
                 'success': 0,
                 'warnings': 0,
@@ -204,25 +206,27 @@ def process_imports_worker():
                 elif import_type == 'purchases':
                     process_purchases_import_background(import_id, file_path, date_format, create_missing)
                 
-                # Mark task as done
-                import_queue.task_done()
+                logger.info(f"Import {import_id} completed successfully")
                 
             except Exception as e:
                 logger.error(f"Error in background import {import_id}: {str(e)}")
                 status_data = {
                     'status': 'error',
+                    'progress': 100,
                     'message': f"Error: {str(e)}",
                     'errors_list': [str(e)]
                 }
                 save_import_status(import_id, status_data)
-                import_queue.task_done()
-                
+            
+            # Mark task as done
+            import_queue.task_done()
+            
             # Force garbage collection
             gc.collect()
             
         except Exception as e:
             logger.error(f"Error in import worker: {str(e)}")
-            time.sleep(5)  # Wait before retrying
+            time.sleep(1)  # Reduced wait time from 5 to 1 second
 
 # Start the background worker thread
 def start_import_worker():
@@ -283,16 +287,16 @@ def process_sales_import_background(import_id, file_path, date_format, create_mi
                 all_customers = {c.name: c for c in session.query(Customer).all()}
                 
                 # Process data in smaller chunks for production
-                chunk_size = 25  # Smaller chunks for production
+                chunk_size = 10  # Smaller chunks for quicker updates
                 chunks = list(process_dataframe_in_chunks(df, chunk_size))
                 total_chunks = len(chunks)
                 
                 for chunk_idx, chunk in enumerate(chunks):
                     try:
                         # Update progress
-                        progress = 10 + int(80 * chunk_idx / total_chunks)
+                        progress = 10 + int(90 * (chunk_idx / total_chunks))  # Changed from 80 to 90 for more visible progress
                         import_results['progress'] = progress
-                        import_results['message'] = f"Processing chunk {chunk_idx + 1} of {total_chunks}..."
+                        import_results['message'] = f"Processing records {chunk_idx * chunk_size + 1} to {min((chunk_idx + 1) * chunk_size, total_rows)}..."
                         save_import_status(import_id, import_results)
                         
                         # Group by invoice number and customer name
@@ -534,16 +538,16 @@ def process_purchases_import_background(import_id, file_path, date_format, creat
                 session.flush()
                 
                 # Process data in smaller chunks for production
-                chunk_size = 25  # Smaller chunks for production
+                chunk_size = 10  # Smaller chunks for quicker updates
                 chunks = list(process_dataframe_in_chunks(df, chunk_size))
                 total_chunks = len(chunks)
                 
                 for chunk_idx, chunk in enumerate(chunks):
                     try:
                         # Update progress
-                        progress = 10 + int(80 * chunk_idx / total_chunks)
+                        progress = 10 + int(90 * (chunk_idx / total_chunks))  # Changed from 80 to 90 for more visible progress
                         import_results['progress'] = progress
-                        import_results['message'] = f"Processing chunk {chunk_idx + 1} of {total_chunks}..."
+                        import_results['message'] = f"Processing records {chunk_idx * chunk_size + 1} to {min((chunk_idx + 1) * chunk_size, total_rows)}..."
                         save_import_status(import_id, import_results)
                         
                         # Group by order ID and vendor
@@ -908,6 +912,13 @@ def process_sales_import():
         }
         save_import_status(import_id, status_data)
         
+        time.sleep(0.5)  # Short delay to allow worker to pick up the task
+        status_data = get_import_status(import_id)
+        if not status_data or status_data.get('status') == 'error':
+            logger.error(f"Import failed to start: {import_id}")
+            flash('Import failed to start. Please try again.', 'error')
+            return redirect(url_for('import_bp.import_data'))
+        
         # Return the status page
         return render_template('import_status.html', import_id=import_id, import_type='sales')
         
@@ -1107,6 +1118,13 @@ def process_purchases_import():
             'message': 'Import queued, waiting to start...'
         }
         save_import_status(import_id, status_data)
+        
+        time.sleep(0.5)  # Short delay to allow worker to pick up the task
+        status_data = get_import_status(import_id)
+        if not status_data or status_data.get('status') == 'error':
+            logger.error(f"Import failed to start: {import_id}")
+            flash('Import failed to start. Please try again.', 'error')
+            return redirect(url_for('import_bp.import_data'))
         
         # Return the status page
         return render_template('import_status.html', import_id=import_id, import_type='purchases')
