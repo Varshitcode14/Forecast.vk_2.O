@@ -177,6 +177,35 @@ def process_dataframe_in_chunks(df, chunk_size=None):
         # Force garbage collection after each chunk
         gc.collect()
 
+
+
+def check_product_user_id_exists():
+    """Check if the user_id column exists in the product table"""
+    try:
+        # Try a simple query that uses the user_id column
+        Product.query.filter_by(user_id=1).first()
+        return True
+    except Exception as e:
+        if 'column product.user_id does not exist' in str(e):
+            logger.error("Product table is missing user_id column. Run migrate_db.py to fix this.")
+            return False
+        # Some other error
+        logger.error(f"Error checking product.user_id: {str(e)}")
+        return False
+
+# Then modify the preview_sales_data and preview_purchases_data functions to use this check
+# For example, in preview_sales_data, add this near the beginning:
+
+@import_bp.route('/import/sales/preview', methods=['POST'])
+@db_retry(max_retries=3, initial_delay=2)
+def preview_sales_data():
+    file_path = request.form.get('file_path')
+    date_format = request.form.get('date_format')
+    
+    # Check if product.user_id exists
+    if not check_product_user_id_exists():
+        flash('Database schema issue: Product table is missing user_id column. Please contact administrator.', 'error')
+        return redirect(url_for('import_bp.import_sales'))
 # Add these functions for database optimization
 
 def optimize_db_for_import():

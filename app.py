@@ -17,58 +17,37 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.urandom(24)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'production-key-for-deployment')
 
-# Replace the database configuration section with this updated version:
+# Direct database configuration with the new URL
+database_url = "postgresql://forecast_vk_3_o_user:kt6HkdhXcO8D7IhYBHJXj6bfimJpw4vj@dpg-cv508d0fnakc7385p35g-a.oregon-postgres.render.com/forecast_vk_3_o"
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_size': 10,
+    'max_overflow': 15,
+    'pool_timeout': 30,
+    'pool_recycle': 60,
+    'pool_pre_ping': True,
+}
 
-# Determine if we're running locally or on Render
-is_production = os.environ.get('RENDER', False)
+# PostgreSQL specific connect args
+app.config['SQLALCHEMY_ENGINE_OPTIONS']['connect_args'] = {
+    'connect_timeout': 10,
+    'application_name': 'forecast_vk_app',
+    'keepalives': 1,
+    'keepalives_idle': 30,
+    'keepalives_interval': 10,
+    'keepalives_count': 5
+}
 
-if is_production:
-    # Use PostgreSQL database for Render deployment
-    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'production-key-for-deployment')
-    
-    # Get database URL from environment variable or use the hardcoded one as fallback
-    database_url = os.environ.get('DATABASE_URL', 
-        "postgresql://forecast_vk_2_0_user:ShNUFtmifpJMpDeBwQ5RA5lg90qcNonG@dpg-cv4i8aogph6c7390jsug-a.oregon-postgres.render.com/forecast_vk_2_0")
-    
-    # Configure SQLAlchemy for PostgreSQL
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'pool_size': 10,  # Increased from 5
-        'max_overflow': 15,  # Increased from 10
-        'pool_timeout': 30,
-        'pool_recycle': 60,
-        'pool_pre_ping': True,
-    }
-    
-    # PostgreSQL specific connect args
-    app.config['SQLALCHEMY_ENGINE_OPTIONS']['connect_args'] = {
-        'connect_timeout': 10,
-        'application_name': 'forecast_vk_app',
-        'keepalives': 1,
-        'keepalives_idle': 30,
-        'keepalives_interval': 10,
-        'keepalives_count': 5
-    }
-    
-    # Log that we're using production settings
-    print("Running with production database settings")
-else:
-    # Use SQLite for local development
-    app.config['SECRET_KEY'] = 'development-key'
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///forecast.db'
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'pool_pre_ping': True
-    }
-    print("Running with development database settings")
+# Log the database URL being used (with password masked for security)
+masked_url = database_url.replace(database_url.split('@')[0].split(':', 2)[2], '********')
+print(f"Using database URL: {masked_url}")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize the database
 db.init_app(app)
-
-# Add this function after the database initialization section to handle database connection errors
 
 # Add a function to test database connectivity
 def test_db_connection():
@@ -85,21 +64,13 @@ def test_db_connection():
 # Test the database connection at startup
 with app.app_context():
     connection_successful = test_db_connection()
-    if not connection_successful and is_production:
-        logger.critical("Failed to connect to production database. Check connection parameters and network.")
+    if not connection_successful:
+        logger.critical("Failed to connect to database. Check connection parameters and network.")
 
 # Add this to your app.py to ensure database connections are properly handled in threads
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 import threading
-
-# SQLite specific optimizations - only apply for SQLite
-if 'sqlite' in app.config['SQLALCHEMY_DATABASE_URI']:
-    @event.listens_for(Engine, "connect")
-    def set_sqlite_pragma(dbapi_connection, connection_record):
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.close()
 
 # Ensure each thread gets its own database connection
 @app.before_request
