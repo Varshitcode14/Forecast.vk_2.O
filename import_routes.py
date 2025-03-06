@@ -7,12 +7,32 @@ from datetime import datetime
 import pytz
 import re
 from models import db, Customer, Vendor, Product, Sale, SaleItem, Purchase, PurchaseItem
+import time
+from functools import wraps
 
 # Create a Blueprint for import routes
 import_bp = Blueprint('import_bp', __name__)
 
 # Define IST timezone
 IST = pytz.timezone('Asia/Kolkata')
+
+# Database connection retry decorator
+def db_retry(max_retries=3, retry_delay=1):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            retries = 0
+            while retries < max_retries:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    retries += 1
+                    if retries >= max_retries:
+                        raise
+                    print(f"Database operation failed, retrying ({retries}/{max_retries}): {str(e)}")
+                    time.sleep(retry_delay)
+        return wrapper
+    return decorator
 
 # Helper function to check allowed file extensions
 def allowed_file(filename):
@@ -21,6 +41,7 @@ def allowed_file(filename):
 # Helper function to create upload directory if it doesn't exist
 def ensure_upload_dir():
     upload_dir = os.path.join(current_app.root_path, 'uploads')
+    
     if not os.path.exists(upload_dir):
         os.makedirs(upload_dir)
     return upload_dir
@@ -125,6 +146,7 @@ def validate_sales_file():
         return redirect(url_for('import_bp.import_sales'))
 
 @import_bp.route('/import/sales/preview', methods=['POST'])
+@db_retry(max_retries=3, retry_delay=2)
 def preview_sales_data():
     file_path = request.form.get('file_path')
     date_format = request.form.get('date_format')
@@ -215,6 +237,7 @@ def preview_sales_data():
         return redirect(url_for('import_bp.import_sales'))
 
 @import_bp.route('/import/sales/process', methods=['POST'])
+@db_retry(max_retries=3, retry_delay=2)
 def process_sales_import():
     file_path = request.form.get('file_path')
     date_format = request.form.get('date_format')
@@ -445,6 +468,7 @@ def validate_purchases_file():
         return redirect(url_for('import_bp.import_purchases'))
 
 @import_bp.route('/import/purchases/preview', methods=['POST'])
+@db_retry(max_retries=3, retry_delay=2)
 def preview_purchases_data():
     file_path = request.form.get('file_path')
     date_format = request.form.get('date_format')
@@ -536,6 +560,7 @@ def preview_purchases_data():
         return redirect(url_for('import_bp.import_purchases'))
 
 @import_bp.route('/import/purchases/process', methods=['POST'])
+@db_retry(max_retries=3, retry_delay=2)
 def process_purchases_import():
     file_path = request.form.get('file_path')
     date_format = request.form.get('date_format')

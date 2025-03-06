@@ -9,11 +9,28 @@ from datetime import datetime, timedelta
 import pytz
 from import_routes import import_bp
 from functools import wraps
+import time
+from sqlalchemy import create_engine
+from sqlalchemy.pool import QueuePool
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://forecast_vk_2_0_user:ShNUFtmifpJMpDeBwQ5RA5lg90qcNonG@dpg-cv4i8aogph6c7390jsug-a.oregon-postgres.render.com/forecast_vk_2_0'
+
+# Use the provided PostgreSQL URL
+database_url = "postgresql://forecast_vk_2_0_user:ShNUFtmifpJMpDeBwQ5RA5lg90qcNonG@dpg-cv4i8aogph6c7390jsug-a.oregon-postgres.render.com/forecast_vk_2_0"
+
+# Configure SQLAlchemy with proper SSL and connection pool settings
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_size': 10,
+    'pool_recycle': 60,
+    'pool_pre_ping': True,
+    'connect_args': {
+        'sslmode': 'require',
+        'connect_timeout': 30
+    }
+}
 
 db.init_app(app)
 
@@ -31,6 +48,24 @@ IST = pytz.timezone('Asia/Kolkata')
 # Helper function to get current time in IST
 def get_current_time_ist():
     return datetime.now(pytz.utc).astimezone(IST)
+
+# Database connection retry decorator
+def db_retry(max_retries=3, retry_delay=1):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            retries = 0
+            while retries < max_retries:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    retries += 1
+                    if retries >= max_retries:
+                        raise
+                    print(f"Database operation failed, retrying ({retries}/{max_retries}): {str(e)}")
+                    time.sleep(retry_delay)
+        return wrapper
+    return decorator
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -748,6 +783,8 @@ def get_report(id):
 
 # Create tables when the app starts
 with app.app_context():
+    # Only create tables if they don't exist
+    # This won't delete existing data
     db.create_all()
     create_admin_user()  # Create admin user if it doesn't exist
 
