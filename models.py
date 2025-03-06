@@ -12,6 +12,12 @@ class User(db.Model, UserMixin):
     password_hash = db.Column(db.String(200), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_admin = db.Column(db.Boolean, default=False)  # Add this line
+    customers = db.relationship('Customer', backref='user', lazy=True)
+    vendors = db.relationship('Vendor', backref='user', lazy=True)
+    products = db.relationship('Product', backref='user', lazy=True)
+    sales = db.relationship('Sale', backref='user', lazy=True)
+    purchases = db.relationship('Purchase', backref='user', lazy=True)
+    reports = db.relationship('Report', backref='user', lazy=True)
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -30,6 +36,7 @@ class User(db.Model, UserMixin):
 
 class Customer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     gst_id = db.Column(db.String(15), unique=True, nullable=False)
     name = db.Column(db.String(100), nullable=False)
     contact_person = db.Column(db.String(100), nullable=True)
@@ -53,6 +60,7 @@ class Customer(db.Model):
 
 class Vendor(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     gst_id = db.Column(db.String(15), unique=True, nullable=False)
     name = db.Column(db.String(100), nullable=False)
     contact_person = db.Column(db.String(100), nullable=True)
@@ -76,6 +84,7 @@ class Vendor(db.Model):
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     product_id = db.Column(db.String(20), unique=True, nullable=False)
     name = db.Column(db.String(100), nullable=False)
     quantity = db.Column(db.Integer, default=0)
@@ -98,6 +107,7 @@ class Product(db.Model):
 
 class Sale(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'), nullable=False)
     sale_date = db.Column(db.DateTime, default=datetime.utcnow)
     delivery_charges = db.Column(db.Float, default=0.0)
@@ -118,6 +128,7 @@ class SaleItem(db.Model):
 
 class Purchase(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     vendor_id = db.Column(db.Integer, db.ForeignKey('vendor.id'), nullable=False)
     purchase_date = db.Column(db.DateTime, default=datetime.utcnow)
     order_id = db.Column(db.String(20), nullable=False)
@@ -139,6 +150,7 @@ class PurchaseItem(db.Model):
 
 class Report(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     report_type = db.Column(db.String(20), nullable=False)  # daily, weekly, monthly, custom
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)

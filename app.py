@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session, abort
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session, abort, g
 from flask_sqlalchemy import SQLAlchemy
 from models import db, User, Customer, Product, Sale, SaleItem, Vendor, Purchase, PurchaseItem, Report
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
@@ -19,28 +19,98 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
 
-# Replace the database configuration section with this:
+# Replace the database configuration section with this updated version:
 
-# Use PostgreSQL database for Render deployment
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'production-key-for-deployment')
-database_url = "postgresql://forecast_vk_2_0_user:ShNUFtmifpJMpDeBwQ5RA5lg90qcNonG@dpg-cv4i8aogph6c7390jsug-a.oregon-postgres.render.com/forecast_vk_2_0"
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_size': 5,
-    'max_overflow': 10,
-    'pool_timeout': 30,
-    'pool_recycle': 60,
-    'pool_pre_ping': True,
-    'connect_args': {
-        'connect_timeout': 10,
-        'application_name': 'forecast_vk_app'
+# Determine if we're running locally or on Render
+is_production = os.environ.get('RENDER', False)
+
+if is_production:
+    # Use PostgreSQL database for Render deployment
+    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'production-key-for-deployment')
+    
+    # Get database URL from environment variable or use the hardcoded one as fallback
+    database_url = os.environ.get('DATABASE_URL', 
+        "postgresql://forecast_vk_2_0_user:ShNUFtmifpJMpDeBwQ5RA5lg90qcNonG@dpg-cv4i8aogph6c7390jsug-a.oregon-postgres.render.com/forecast_vk_2_0")
+    
+    # Configure SQLAlchemy for PostgreSQL
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_size': 10,  # Increased from 5
+        'max_overflow': 15,  # Increased from 10
+        'pool_timeout': 30,
+        'pool_recycle': 60,
+        'pool_pre_ping': True,
     }
-}
+    
+    # PostgreSQL specific connect args
+    app.config['SQLALCHEMY_ENGINE_OPTIONS']['connect_args'] = {
+        'connect_timeout': 10,
+        'application_name': 'forecast_vk_app',
+        'keepalives': 1,
+        'keepalives_idle': 30,
+        'keepalives_interval': 10,
+        'keepalives_count': 5
+    }
+    
+    # Log that we're using production settings
+    print("Running with production database settings")
+else:
+    # Use SQLite for local development
+    app.config['SECRET_KEY'] = 'development-key'
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///forecast.db'
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True
+    }
+    print("Running with development database settings")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize the database
 db.init_app(app)
+
+# Add this function after the database initialization section to handle database connection errors
+
+# Add a function to test database connectivity
+def test_db_connection():
+    try:
+        # Try to execute a simple query
+        with app.app_context():
+            db.session.execute('SELECT 1')
+            logger.info("Database connection successful")
+            return True
+    except Exception as e:
+        logger.error(f"Database connection failed: {str(e)}")
+        return False
+
+# Test the database connection at startup
+with app.app_context():
+    connection_successful = test_db_connection()
+    if not connection_successful and is_production:
+        logger.critical("Failed to connect to production database. Check connection parameters and network.")
+
+# Add this to your app.py to ensure database connections are properly handled in threads
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+import threading
+
+# SQLite specific optimizations - only apply for SQLite
+if 'sqlite' in app.config['SQLALCHEMY_DATABASE_URI']:
+    @event.listens_for(Engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.close()
+
+# Ensure each thread gets its own database connection
+@app.before_request
+def before_request():
+    if not hasattr(g, 'db_conn'):
+        g.db_conn = db.engine.connect()
+
+@app.teardown_request
+def teardown_request(exception):
+    if hasattr(g, 'db_conn'):
+        g.db_conn.close()
 
 # Define IST timezone
 IST = pytz.timezone('Asia/Kolkata')
@@ -251,45 +321,52 @@ def generate_daily_report():
             # Get today's date in IST
             today = get_current_time_ist().date()
             
-            # Get sales and purchases for today
-            sales = Sale.query.filter(
-                Sale.sale_date >= today,
-                Sale.sale_date < today + timedelta(days=1)
-            ).all()
+            # Get all users
+            users = User.query.all()
             
-            purchases = Purchase.query.filter(
-                Purchase.purchase_date >= today,
-                Purchase.purchase_date < today + timedelta(days=1)
-            ).all()
+            for user in users:
+                # Get sales and purchases for today for this user
+                sales = Sale.query.filter(
+                    Sale.user_id == user.id,
+                    Sale.sale_date >= today,
+                    Sale.sale_date < today + timedelta(days=1)
+                ).all()
+                
+                purchases = Purchase.query.filter(
+                    Purchase.user_id == user.id,
+                    Purchase.purchase_date >= today,
+                    Purchase.purchase_date < today + timedelta(days=1)
+                ).all()
+                
+                # Calculate totals
+                total_sales = sum(sale.total_amount for sale in sales)
+                total_purchases = sum(purchase.total_amount for purchase in purchases)
+                net_profit = total_sales - total_purchases
+                profit_margin = (net_profit / total_sales * 100) if total_sales > 0 else 0
+                
+                # Check inventory status
+                products = Product.query.filter_by(user_id=user.id).all()
+                low_stock_count = sum(1 for p in products if p.quantity > 0 and p.quantity <= 10)
+                out_of_stock_count = sum(1 for p in products if p.quantity <= 0)
+                
+                # Create a new report object
+                report = Report(
+                    user_id=user.id,
+                    report_type='daily',
+                    start_date=today,
+                    end_date=today,
+                    total_sales=total_sales,
+                    total_purchases=total_purchases,
+                    net_profit=net_profit,
+                    profit_margin=profit_margin,
+                    low_stock_count=low_stock_count,
+                    out_of_stock_count=out_of_stock_count
+                )
+                
+                db.session.add(report)
             
-            # Calculate totals
-            total_sales = sum(sale.total_amount for sale in sales)
-            total_purchases = sum(purchase.total_amount for purchase in purchases)
-            net_profit = total_sales - total_purchases
-            profit_margin = (net_profit / total_sales * 100) if total_sales > 0 else 0
-            
-            # Check inventory status
-            products = Product.query.all()
-            low_stock_count = sum(1 for p in products if p.quantity > 0 and p.quantity <= 10)
-            out_of_stock_count = sum(1 for p in products if p.quantity <= 0)
-            
-            # Create a new report object
-            report = Report(
-                report_type='daily',
-                start_date=today,
-                end_date=today,
-                total_sales=total_sales,
-                total_purchases=total_purchases,
-                net_profit=net_profit,
-                profit_margin=profit_margin,
-                low_stock_count=low_stock_count,
-                out_of_stock_count=out_of_stock_count
-            )
-            
-            db.session.add(report)
             db.session.commit()
-            
-            logger.info(f"Daily Report Generated for {today}")
+            logger.info(f"Daily Reports Generated for {today}")
         except Exception as e:
             db.session.rollback()
             logger.error(f"Error generating daily report: {str(e)}")
@@ -311,7 +388,7 @@ def forecast_reports():
 @regular_user_required
 def stock():
     try:
-        products = Product.query.all()
+        products = Product.query.filter_by(user_id=current_user.id).all()
         return render_template('stock.html', products=products)
     except Exception as e:
         logger.error(f"Error in stock route: {str(e)}")
@@ -323,7 +400,7 @@ def stock():
 @regular_user_required
 def sales():
     try:
-        sales = Sale.query.order_by(Sale.sale_date.desc()).all()
+        sales = Sale.query.filter_by(user_id=current_user.id).order_by(Sale.sale_date.desc()).all()
         return render_template('sales.html', sales=sales)
     except Exception as e:
         logger.error(f"Error in sales route: {str(e)}")
@@ -335,7 +412,7 @@ def sales():
 @regular_user_required
 def purchases():
     try:
-        purchases = Purchase.query.order_by(Purchase.purchase_date.desc()).all()
+        purchases = Purchase.query.filter_by(user_id=current_user.id).order_by(Purchase.purchase_date.desc()).all()
         return render_template('purchases.html', purchases=purchases)
     except Exception as e:
         logger.error(f"Error in purchases route: {str(e)}")
@@ -347,7 +424,7 @@ def purchases():
 @regular_user_required
 def customers():
     try:
-        customers = Customer.query.all()
+        customers = Customer.query.filter_by(user_id=current_user.id).all()
         return render_template('customers.html', customers=customers)
     except Exception as e:
         logger.error(f"Error in customers route: {str(e)}")
@@ -359,7 +436,7 @@ def customers():
 @regular_user_required
 def vendors():
     try:
-        vendors = Vendor.query.all()
+        vendors = Vendor.query.filter_by(user_id=current_user.id).all()
         return render_template('vendors.html', vendors=vendors)
     except Exception as e:
         logger.error(f"Error in vendors route: {str(e)}")
@@ -390,7 +467,7 @@ def import_data():
 @login_required
 def get_customers():
     try:
-        customers = Customer.query.all()
+        customers = Customer.query.filter_by(user_id=current_user.id).all()
         return jsonify([customer.to_dict() for customer in customers])
     except Exception as e:
         logger.error(f"Error in get_customers: {str(e)}")
@@ -402,12 +479,13 @@ def add_customer():
     try:
         data = request.json
 
-        # Check if customer with GST ID already exists
-        existing_customer = Customer.query.filter_by(gst_id=data['gst_id']).first()
+        # Check if customer with GST ID already exists for this user
+        existing_customer = Customer.query.filter_by(user_id=current_user.id, gst_id=data['gst_id']).first()
         if existing_customer:
             return jsonify({'success': False, 'message': 'Customer with this GST ID already exists'}), 400
 
         customer = Customer(
+            user_id=current_user.id,
             gst_id=data['gst_id'],
             name=data['name'],
             contact_person=data.get('contact_person', ''),
@@ -470,7 +548,7 @@ def delete_customer(id):
 @login_required
 def get_vendors():
     try:
-        vendors = Vendor.query.all()
+        vendors = Vendor.query.filter_by(user_id=current_user.id).all()
         return jsonify([vendor.to_dict() for vendor in vendors])
     except Exception as e:
         logger.error(f"Error in get_vendors: {str(e)}")
@@ -482,12 +560,13 @@ def add_vendor():
     try:
         data = request.json
 
-        # Check if vendor with GST ID already exists
-        existing_vendor = Vendor.query.filter_by(gst_id=data['gst_id']).first()
+        # Check if vendor with GST ID already exists for this user
+        existing_vendor = Vendor.query.filter_by(user_id=current_user.id, gst_id=data['gst_id']).first()
         if existing_vendor:
             return jsonify({'success': False, 'message': 'Vendor with this GST ID already exists'}), 400
 
         vendor = Vendor(
+            user_id=current_user.id,
             gst_id=data['gst_id'],
             name=data['name'],
             contact_person=data.get('contact_person', ''),
@@ -550,7 +629,7 @@ def delete_vendor(id):
 @login_required
 def get_products():
     try:
-        products = Product.query.all()
+        products = Product.query.filter_by(user_id=current_user.id).all()
         return jsonify([product.to_dict() for product in products])
     except Exception as e:
         logger.error(f"Error in get_products: {str(e)}")
@@ -562,12 +641,13 @@ def add_product():
     try:
         data = request.json
 
-        # Check if product with product ID already exists
-        existing_product = Product.query.filter_by(product_id=data['product_id']).first()
+        # Check if product with product ID already exists for this user
+        existing_product = Product.query.filter_by(user_id=current_user.id, product_id=data['product_id']).first()
         if existing_product:
             return jsonify({'success': False, 'message': 'Product with this ID already exists'}), 400
 
         product = Product(
+            user_id=current_user.id,
             product_id=data['product_id'],
             name=data['name'],
             quantity=data['quantity'],
@@ -631,12 +711,13 @@ def add_sale():
         data = request.json
 
         # Get customer
-        customer = Customer.query.get(data['customer_id'])
+        customer = Customer.query.filter_by(id=data['customer_id'], user_id=current_user.id).first()
         if not customer:
             return jsonify({'success': False, 'message': 'Customer not found'}), 404
 
         # Create sale with IST time
         sale = Sale(
+            user_id=current_user.id,
             customer_id=customer.id,
             delivery_charges=data['delivery_charges'],
             total_amount=data['total_amount'],
@@ -647,19 +728,19 @@ def add_sale():
 
         # Add sale items
         for item_data in data['items']:
-            product = Product.query.get(item_data['product_id'])
+            product = Product.query.filter_by(id=item_data['product_id'], user_id=current_user.id).first()
             if not product:
                 db.session.rollback()
                 return jsonify({'success': False, 'message': f'Product not found: {item_data["product_id"]}'}), 404
-            
+          
             # Check if enough stock
             if product.quantity < item_data['quantity']:
                 db.session.rollback()
                 return jsonify({'success': False, 'message': f'Not enough stock for product: {product.name}'}), 400
-            
+          
             # Update product quantity
             product.quantity -= item_data['quantity']
-            
+          
             # Create sale item
             sale_item = SaleItem(
                 sale=sale,
@@ -670,7 +751,7 @@ def add_sale():
                 unit_price=item_data.get('unit_price', product.cost_per_unit),  # Use provided unit price or default to product cost
                 total_price=item_data['total_price']
             )
-            
+          
             db.session.add(sale_item)
 
         db.session.commit()
@@ -685,14 +766,14 @@ def add_sale():
 @login_required
 def get_sales():
     try:
-        sales = Sale.query.all()
+        sales = Sale.query.filter_by(user_id=current_user.id).all()
         logger.info(f"Fetched {len(sales)} sales records from database")
         result = []
 
         for sale in sales:
             # Format date in IST
             sale_date_ist = sale.sale_date.astimezone(IST) if sale.sale_date.tzinfo else IST.localize(sale.sale_date)
-            
+          
             sale_data = {
                 'id': sale.id,
                 'customer_name': sale.customer.name,
@@ -702,7 +783,7 @@ def get_sales():
                 'total_amount': sale.total_amount,
                 'items': []
             }
-            
+          
             for item in sale.items:
                 item_data = {
                     'product_name': item.product.name,
@@ -714,7 +795,7 @@ def get_sales():
                     'total_price': item.total_price
                 }
                 sale_data['items'].append(item_data)
-            
+          
             result.append(sale_data)
 
         logger.info(f"Returning {len(result)} formatted sales records")
@@ -756,12 +837,13 @@ def add_purchase():
         data = request.json
 
         # Get vendor
-        vendor = Vendor.query.get(data['vendor_id'])
+        vendor = Vendor.query.filter_by(id=data['vendor_id'], user_id=current_user.id).first()
         if not vendor:
             return jsonify({'success': False, 'message': 'Vendor not found'}), 404
 
         # Create purchase with IST time
         purchase = Purchase(
+            user_id=current_user.id,
             vendor_id=vendor.id,
             order_id=data['order_id'],
             delivery_charges=data['delivery_charges'],
@@ -778,11 +860,11 @@ def add_purchase():
 
         # Add purchase items
         for item_data in data['items']:
-            product = Product.query.get(item_data['product_id'])
+            product = Product.query.filter_by(id=item_data['product_id'], user_id=current_user.id).first()
             if not product:
                 db.session.rollback()
                 return jsonify({'success': False, 'message': f'Product not found: {item_data["product_id"]}'}), 404
-            
+          
             # Create purchase item
             purchase_item = PurchaseItem(
                 purchase=purchase,
@@ -792,9 +874,9 @@ def add_purchase():
                 unit_price=item_data['unit_price'],
                 total_price=item_data['total_price']
             )
-            
+          
             db.session.add(purchase_item)
-            
+          
             # Update product quantity if purchase is delivered
             if data['status'] == 'Delivered':
                 product.quantity += item_data['quantity']
@@ -811,13 +893,13 @@ def add_purchase():
 @login_required
 def get_purchases():
     try:
-        purchases = Purchase.query.all()
+        purchases = Purchase.query.filter_by(user_id=current_user.id).all()
         result = []
 
         for purchase in purchases:
             # Format date in IST
             purchase_date_ist = purchase.purchase_date.astimezone(IST) if purchase.purchase_date.tzinfo else IST.localize(purchase.purchase_date)
-            
+          
             purchase_data = {
                 'id': purchase.id,
                 'vendor_name': purchase.vendor.name,
@@ -829,7 +911,7 @@ def get_purchases():
                 'status': purchase.status,
                 'items': []
             }
-            
+          
             for item in purchase.items:
                 item_data = {
                     'product_name': item.product.name,
@@ -840,7 +922,7 @@ def get_purchases():
                     'total_price': item.total_price
                 }
                 purchase_data['items'].append(item_data)
-            
+          
             result.append(purchase_data)
 
         return jsonify(result)
@@ -912,8 +994,8 @@ def delete_purchase(id):
 @login_required
 def get_reports():
     try:
-        # Fetch reports from the database
-        reports = Report.query.order_by(Report.created_at.desc()).all()
+        # Fetch reports from the database for the current user
+        reports = Report.query.filter_by(user_id=current_user.id).order_by(Report.created_at.desc()).all()
         return jsonify([report.to_dict() for report in reports])
     except Exception as e:
         logger.error(f"Error in get_reports: {str(e)}")

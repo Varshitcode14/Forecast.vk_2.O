@@ -4,237 +4,338 @@
 
 {% block content %}
 <div class="container mt-4">
-    <div class="row">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header">
-                    <h4>Import Status</h4>
-                </div>
-                <div class="card-body">
-                    <div id="status-container">
-                        <div class="text-center">
-                            <div class="progress mb-3">
-                                <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
-                            </div>
-                            <h5 id="status-message">Starting import...</h5>
-                            <div id="loading-indicator" class="mt-3">
-                                <div class="dot-wave">
-                                    <div class="dot-wave__dot"></div>
-                                    <div class="dot-wave__dot"></div>
-                                    <div class="dot-wave__dot"></div>
-                                    <div class="dot-wave__dot"></div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div id="results-container" class="mt-4" style="display: none;">
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <div class="card bg-success text-white">
-                                        <div class="card-body text-center">
-                                            <h5 class="card-title">Success</h5>
-                                            <h3 id="success-count">0</h3>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="card bg-warning text-white">
-                                        <div class="card-body text-center">
-                                            <h5 class="card-title">Warnings</h5>
-                                            <h3 id="warnings-count">0</h3>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="card bg-danger text-white">
-                                        <div class="card-body text-center">
-                                            <h5 class="card-title">Errors</h5>
-                                            <h3 id="errors-count">0</h3>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="mt-4">
-                                <h5>New Items Created</h5>
-                                <div id="new-items-container">
-                                    <p>No new items created.</p>
-                                </div>
-                            </div>
-                            
-                            <div class="mt-4">
-                                <h5>Errors and Warnings</h5>
-                                <div id="errors-container">
-                                    <p>No errors or warnings.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="text-center mt-4">
-                        <a id="back-button" href="{{ url_for('import_bp.import_data') }}" class="btn btn-primary">Back to Import</a>
-                        <a id="view-data-button" style="display: none;" href="#" class="btn btn-success">View Imported Data</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+  <div class="row">
+      <div class="col-md-12">
+          <div class="card">
+              <div class="card-header">
+                  <h4>Import Status</h4>
+              </div>
+              <div class="card-body">
+                  <div id="status-container">
+                      <div class="text-center">
+                          <div class="progress mb-3">
+                              <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                          </div>
+                          <h5 id="status-message">Starting import...</h5>
+                          <div id="loading-indicator" class="mt-3">
+                              <div class="dot-wave">
+                                  <div class="dot-wave__dot"></div>
+                                  <div class="dot-wave__dot"></div>
+                                  <div class="dot-wave__dot"></div>
+                                  <div class="dot-wave__dot"></div>
+                              </div>
+                          </div>
+                      </div>
+                      
+                      <div id="results-container" class="mt-4" style="display: none;">
+                          <div class="row">
+                              <div class="col-md-4">
+                                  <div class="card bg-success text-white">
+                                      <div class="card-body text-center">
+                                          <h5 class="card-title">Success</h5>
+                                          <h3 id="success-count">0</h3>
+                                      </div>
+                                  </div>
+                              </div>
+                              <div class="col-md-4">
+                                  <div class="card bg-warning text-white">
+                                      <div class="card-body text-center">
+                                          <h5 class="card-title">Warnings</h5>
+                                          <h3 id="warnings-count">0</h3>
+                                      </div>
+                                  </div>
+                              </div>
+                              <div class="col-md-4">
+                                  <div class="card bg-danger text-white">
+                                      <div class="card-body text-center">
+                                          <h5 class="card-title">Errors</h5>
+                                          <h3 id="errors-count">0</h3>
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+                          
+                          <div class="mt-4" id="new-items-section">
+                              <h5>New Items Created</h5>
+                              <div id="new-items-container">
+                                  <p>No new items created.</p>
+                              </div>
+                          </div>
+                          
+                          <div class="mt-4" id="errors-section">
+                              <h5>Errors and Warnings</h5>
+                              <div id="errors-container">
+                                  <p>No errors or warnings.</p>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+                  
+                  <div class="text-center mt-4">
+                      <a id="back-button" href="{{ url_for('import_bp.import_data') }}" class="btn btn-primary">Back to Import</a>
+                      <a id="view-data-button" style="display: none;" href="#" class="btn btn-success">View Imported Data</a>
+                      <a id="retry-button" style="display: none;" href="#" class="btn btn-warning">Retry Import</a>
+                  </div>
+              </div>
+          </div>
+      </div>
+  </div>
 </div>
 
 <script>
-    const importId = "{{ import_id }}";
-    const importType = "{{ import_type }}";
-    let checkInterval;
-    let isCompleted = false;
-    let retryCount = 0;
-    const maxRetries = 3;
-    
-    function updateViewDataButton() {
-        const viewDataButton = document.getElementById('view-data-button');
-        if (importType === 'sales') {
-            viewDataButton.href = "{{ url_for('sales') }}";
-        } else if (importType === 'purchases') {
-            viewDataButton.href = "{{ url_for('purchases') }}";
-        }
-    }
-    
-    function checkStatus() {
-        fetch(`/import/status/${importId}`)
-            .then(response => response.json())
-            .then(data => {
-                retryCount = 0; // Reset retry count on successful response
-                
-                // Update progress bar
-                const progressBar = document.getElementById('progress-bar');
-                progressBar.style.width = `${data.progress || 0}%`;
-                
-                // Update status message
-                const statusMessage = document.getElementById('status-message');
-                statusMessage.textContent = data.message || 'Processing...';
-                
-                // Check if completed or error
-                if (data.status === 'completed' || data.status === 'error') {
-                    if (!isCompleted) {
-                        isCompleted = true;
-                        clearInterval(checkInterval);
-                        document.getElementById('loading-indicator').style.display = 'none';
-                        document.getElementById('results-container').style.display = 'block';
-                        
-                        // Update counts
-                        document.getElementById('success-count').textContent = data.success || 0;
-                        document.getElementById('warnings-count').textContent = data.warnings || 0;
-                        document.getElementById('errors-count').textContent = data.errors || 0;
-                        
-                        // Update new items
-                        const newItemsContainer = document.getElementById('new-items-container');
-                        let newItemsHtml = '';
-                        
-                        if (data.new_customers && data.new_customers.length > 0) {
-                            newItemsHtml += '<h6>New Customers:</h6><ul>';
-                            data.new_customers.forEach(item => {
-                                newItemsHtml += `<li>${item}</li>`;
-                            });
-                            newItemsHtml += '</ul>';
-                        }
-                        
-                        if (data.new_products && data.new_products.length > 0) {
-                            newItemsHtml += '<h6>New Products:</h6><ul>';
-                            data.new_products.forEach(item => {
-                                newItemsHtml += `<li>${item}</li>`;
-                            });
-                            newItemsHtml += '</ul>';
-                        }
-                        
-                        if (newItemsHtml) {
-                            newItemsContainer.innerHTML = newItemsHtml;
-                        }
-                        
-                        // Update errors
-                        const errorsContainer = document.getElementById('errors-container');
-                        if (data.errors_list && data.errors_list.length > 0) {
-                            let errorsHtml = '<ul class="text-danger">';
-                            data.errors_list.forEach(error => {
-                                errorsHtml += `<li>${error}</li>`;
-                            });
-                            errorsHtml += '</ul>';
-                            errorsContainer.innerHTML = errorsHtml;
-                        }
-                        
-                        // Show view data button if successful
-                        if (data.status === 'completed' && data.success > 0) {
-                            document.getElementById('view-data-button').style.display = 'inline-block';
-                            updateViewDataButton();
-                        }
-                        
-                        // Update progress bar color based on status
-                        if (data.status === 'error') {
-                            progressBar.classList.remove('bg-primary');
-                            progressBar.classList.add('bg-danger');
-                        } else {
-                            progressBar.classList.remove('bg-primary');
-                            progressBar.classList.add('bg-success');
-                        }
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Error checking status:', error);
-                retryCount++;
-                if (retryCount >= maxRetries) {
-                    clearInterval(checkInterval);
-                    document.getElementById('status-message').textContent = 'Error: Failed to check import status';
-                    document.getElementById('loading-indicator').style.display = 'none';
-                }
-            });
-    }
-    
-    // Check status immediately and then every second
-    checkStatus();
-    checkInterval = setInterval(checkStatus, 500);
-    
-    // Update view data button on page load
-    updateViewDataButton();
+  const importId = "{{ import_id }}";
+  const importType = "{{ import_type }}";
+  let checkInterval;
+  let isCompleted = false;
+  let retryCount = 0;
+  const maxRetries = 3;
+  
+  function updateViewDataButton() {
+      const viewDataButton = document.getElementById('view-data-button');
+      if (importType === 'sales') {
+          viewDataButton.href = "{{ url_for('sales') }}";
+      } else if (importType === 'purchases') {
+          viewDataButton.href = "{{ url_for('purchases') }}";
+      }
+  }
+
+  // Function to group similar warnings
+  function groupWarnings(errorsList) {
+      const stockWarnings = {};
+      const otherErrors = [];
+      
+      errorsList.forEach(error => {
+          // Check if it's a stock warning
+          const stockMatch = error.match(/Warning: Not enough stock for product (.*?)\. Current: (.*?), Required: (.*?)$/);
+          if (stockMatch) {
+              const product = stockMatch[1];
+              const current = parseInt(stockMatch[2]);
+              const required = parseInt(stockMatch[3]);
+              
+              if (!stockWarnings[product]) {
+                  stockWarnings[product] = {
+                      count: 0,
+                      minStock: current,
+                      maxRequired: required
+                  };
+              }
+              
+              stockWarnings[product].count++;
+              stockWarnings[product].minStock = Math.min(stockWarnings[product].minStock, current);
+              stockWarnings[product].maxRequired = Math.max(stockWarnings[product].maxRequired, required);
+          } else {
+              otherErrors.push(error);
+          }
+      });
+      
+      return { stockWarnings, otherErrors };
+  }
+  
+  function checkStatus() {
+      fetch(`/import/status/${importId}`)
+          .then(response => response.json())
+          .then(data => {
+              retryCount = 0; // Reset retry count on successful response
+              
+              // Update progress bar
+              const progressBar = document.getElementById('progress-bar');
+              progressBar.style.width = `${data.progress || 0}%`;
+              
+              // Update status message
+              const statusMessage = document.getElementById('status-message');
+              statusMessage.textContent = data.message || 'Processing...';
+              
+              // Check if completed or error
+              if (data.status === 'completed' || data.status === 'error') {
+                  if (!isCompleted) {
+                      isCompleted = true;
+                      clearInterval(checkInterval);
+                      document.getElementById('loading-indicator').style.display = 'none';
+                      document.getElementById('results-container').style.display = 'block';
+                      
+                      // Update counts
+                      document.getElementById('success-count').textContent = data.success || 0;
+                      document.getElementById('warnings-count').textContent = data.warnings || 0;
+                      document.getElementById('errors-count').textContent = data.errors || 0;
+                      
+                      // Update new items
+                      const newItemsContainer = document.getElementById('new-items-container');
+                      let newItemsHtml = '';
+                      
+                      if ((data.new_customers && data.new_customers.length > 0) || 
+                          (data.new_products && data.new_products.length > 0) ||
+                          (data.new_vendors && data.new_vendors.length > 0)) {
+                          
+                          if (data.new_customers && data.new_customers.length > 0) {
+                              newItemsHtml += '<h6>New Customers:</h6><ul>';
+                              data.new_customers.forEach(item => {
+                                  newItemsHtml += `<li>${item}</li>`;
+                              });
+                              newItemsHtml += '</ul>';
+                          }
+                          
+                          if (data.new_products && data.new_products.length > 0) {
+                              newItemsHtml += '<h6>New Products:</h6><ul>';
+                              data.new_products.forEach(item => {
+                                  newItemsHtml += `<li>${item}</li>`;
+                              });
+                              newItemsHtml += '</ul>';
+                          }
+                          
+                          if (data.new_vendors && data.new_vendors.length > 0) {
+                              newItemsHtml += '<h6>New Vendors:</h6><ul>';
+                              data.new_vendors.forEach(item => {
+                                  newItemsHtml += `<li>${item}</li>`;
+                              });
+                              newItemsHtml += '</ul>';
+                          }
+                          
+                          newItemsContainer.innerHTML = newItemsHtml;
+                      } else {
+                          document.getElementById('new-items-section').style.display = 'none';
+                      }
+                      
+                      // Update errors and warnings with grouping
+                      const errorsContainer = document.getElementById('errors-container');
+                      if (data.errors_list && data.errors_list.length > 0) {
+                          const { stockWarnings, otherErrors } = groupWarnings(data.errors_list);
+                          
+                          let errorsHtml = '';
+                          
+                          // Add stock warnings in a compact format
+                          if (Object.keys(stockWarnings).length > 0) {
+                              errorsHtml += '<div class="card mb-3"><div class="card-header bg-warning text-white">Stock Warnings</div>';
+                              errorsHtml += '<div class="card-body"><div class="table-responsive"><table class="table table-sm table-striped">';
+                              errorsHtml += '<thead><tr><th>Product</th><th>Occurrences</th><th>Min Stock</th><th>Max Required</th></tr></thead><tbody>';
+                              
+                              for (const [product, info] of Object.entries(stockWarnings)) {
+                                  errorsHtml += `<tr>
+                                      <td>${product}</td>
+                                      <td>${info.count}</td>
+                                      <td>${info.minStock}</td>
+                                      <td>${info.maxRequired}</td>
+                                  </tr>`;
+                              }
+                              
+                              errorsHtml += '</tbody></table></div></div></div>';
+                          }
+                          
+                          // Add other errors in a scrollable container
+                          if (otherErrors.length > 0) {
+                              errorsHtml += '<div class="card"><div class="card-header bg-danger text-white">Other Errors</div>';
+                              errorsHtml += '<div class="card-body"><div class="error-scroll">';
+                              errorsHtml += '<ul class="text-danger">';
+                              
+                              otherErrors.forEach(error => {
+                                  errorsHtml += `<li>${error}</li>`;
+                              });
+                              
+                              errorsHtml += '</ul></div></div></div>';
+                          }
+                          
+                          errorsContainer.innerHTML = errorsHtml;
+                      } else {
+                          document.getElementById('errors-section').style.display = 'none';
+                      }
+                      
+                      // Show view data button if successful
+                      if (data.status === 'completed' && data.success > 0) {
+                          document.getElementById('view-data-button').style.display = 'inline-block';
+                          updateViewDataButton();
+                      }
+                      
+                      // Show retry button if error
+                      if (data.status === 'error') {
+                          const retryButton = document.getElementById('retry-button');
+                          retryButton.style.display = 'inline-block';
+                          retryButton.href = importType === 'sales' 
+                              ? "{{ url_for('import_bp.import_sales') }}" 
+                              : "{{ url_for('import_bp.import_purchases') }}";
+                      }
+                      
+                      // Update progress bar color based on status
+                      if (data.status === 'error') {
+                          progressBar.classList.remove('bg-primary');
+                          progressBar.classList.add('bg-danger');
+                      } else {
+                          progressBar.classList.remove('bg-primary');
+                          progressBar.classList.add('bg-success');
+                      }
+                  }
+              }
+          })
+          .catch(error => {
+              console.error('Error checking status:', error);
+              retryCount++;
+              if (retryCount >= maxRetries) {
+                  clearInterval(checkInterval);
+                  document.getElementById('status-message').textContent = 'Error: Failed to check import status';
+                  document.getElementById('loading-indicator').style.display = 'none';
+              }
+          });
+  }
+  
+  // Check status immediately and then every second
+  checkStatus();
+  checkInterval = setInterval(checkStatus, 500);
+  
+  // Update view data button on page load
+  updateViewDataButton();
 </script>
 
 <style>
-    .dot-wave {
-        position: relative;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 40px;
-    }
-    
-    .dot-wave__dot {
-        display: inline-block;
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        margin: 0 4px;
-        background-color: #007bff;
-        animation: dot-wave 1.5s infinite ease-in-out;
-    }
-    
-    .dot-wave__dot:nth-child(1) {
-        animation-delay: -0.3s;
-    }
-    
-    .dot-wave__dot:nth-child(2) {
-        animation-delay: -0.2s;
-    }
-    
-    .dot-wave__dot:nth-child(3) {
-        animation-delay: -0.1s;
-    }
-    
-    @keyframes dot-wave {
-        0%, 60%, 100% {
-            transform: translateY(0);
-        }
-        30% {
-            transform: translateY(-10px);
-        }
-    }
+  .dot-wave {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 40px;
+  }
+  
+  .dot-wave__dot {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin: 0 4px;
+      background-color: #007bff;
+      animation: dot-wave 1.5s infinite ease-in-out;
+  }
+  
+  .dot-wave__dot:nth-child(1) {
+      animation-delay: -0.3s;
+  }
+  
+  .dot-wave__dot:nth-child(2) {
+      animation-delay: -0.2s;
+  }
+  
+  .dot-wave__dot:nth-child(3) {
+      animation-delay: -0.1s;
+  }
+  
+  @keyframes dot-wave {
+      0%, 60%, 100% {
+          transform: translateY(0);
+      }
+      30% {
+          transform: translateY(-10px);
+      }
+  }
+
+  /* Add styles for the error scrollable container */
+  .error-scroll {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #dee2e6;
+      padding: 10px;
+      border-radius: 4px;
+  }
+
+  /* Make the table more compact */
+  .table-sm td, .table-sm th {
+      padding: 0.3rem;
+  }
 </style>
 {% endblock %}
 

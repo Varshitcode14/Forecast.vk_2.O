@@ -10,10 +10,14 @@ from models import db, Customer, Vendor, Product, Sale, SaleItem, Purchase, Purc
 import time
 import logging
 from functools import wraps
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, or_
 from sqlalchemy.pool import QueuePool
 import gc  # Garbage collection
 import json
+import threading
+from flask import jsonify, Response, stream_with_context
+from flask_login import current_user
+import uuid  # For generating truly unique IDs
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -111,13 +115,165 @@ def generate_product_id(product_name):
     
     return f"P{prefix}{suffix}"
 
-# Helper function to process data in chunks (smaller chunks for production)
-def process_dataframe_in_chunks(df, chunk_size=50):
+# Completely rewritten function to generate truly unique GST IDs
+def generate_unique_gst_id(entity_type, user_id):
+    """
+    Generate a globally unique GST ID that doesn't conflict with any existing IDs
+    
+    Args:
+        entity_type: String, either 'CUST' for customer or 'VEND' for vendor
+        user_id: The user ID to associate with this entity
+        
+    Returns:
+        A unique GST ID string
+    """
+    try:
+        # Create a base prefix that includes user ID to avoid conflicts between users
+        base_prefix = f"{entity_type}{user_id}"
+        
+        # Generate a short random suffix (8 chars from uuid4)
+        random_suffix = str(uuid.uuid4()).replace('-', '')[:8].upper()
+        
+        # Combine to create a unique ID
+        unique_id = f"{base_prefix}_{random_suffix}"
+        
+        # Double-check it doesn't exist in the database
+        if entity_type == 'CUST':
+            exists = Customer.query.filter_by(gst_id=unique_id).first() is not None
+        else:  # VEND
+            exists = Vendor.query.filter_by(gst_id=unique_id).first() is not None
+            
+        # In the extremely unlikely case of a collision, try again
+        if exists:
+            return generate_unique_gst_id(entity_type, user_id)
+            
+        logger.info(f"Generated unique GST ID: {unique_id}")
+        return unique_id
+        
+    except Exception as e:
+        logger.error(f"Error generating unique GST ID: {str(e)}")
+        # Fallback to timestamp-based ID to ensure uniqueness
+        timestamp = int(time.time())
+        return f"{entity_type}{user_id}_{timestamp}"
+
+# Add this function at the top of your file, after the imports
+def is_production():
+    """Check if we're running in production environment"""
+    return os.environ.get('RENDER', False)
+
+# Modify the process_dataframe_in_chunks function
+def process_dataframe_in_chunks(df, chunk_size=None):
+    """Process dataframe in chunks to avoid memory issues"""
+    # Use smaller chunks in production
+    if chunk_size is None:
+        chunk_size = 10 if is_production() else 25
+    
     num_chunks = len(df) // chunk_size + (1 if len(df) % chunk_size else 0)
     for i in range(num_chunks):
         start_idx = i * chunk_size
         end_idx = min((i + 1) * chunk_size, len(df))
-        yield df.iloc[start_idx:end_idx]
+        chunk = df.iloc[start_idx:end_idx].copy()  # Use copy to avoid memory leaks
+        yield chunk
+        # Force garbage collection after each chunk
+        gc.collect()
+
+# Add these functions for database optimization
+
+def optimize_db_for_import():
+    """Optimize database for bulk imports"""
+    try:
+        # Only run PostgreSQL specific optimizations in production
+        if is_production():
+            # Create a new connection to run these commands
+            engine = db.engine
+            connection = engine.raw_connection()
+            cursor = connection.cursor()
+            
+            # Disable triggers temporarily
+            cursor.execute("SET session_replication_role = 'replica';")
+            
+            # Increase work memory for sorting
+            cursor.execute("SET work_mem = '64MB';")
+            
+            # Disable synchronous commit temporarily
+            cursor.execute("SET synchronous_commit = OFF;")
+            
+            connection.commit()
+            cursor.close()
+            connection.close()
+            
+            logger.info("Database optimized for import")
+        else:
+            # SQLite optimizations
+            engine = db.engine
+            connection = engine.raw_connection()
+            cursor = connection.cursor()
+            
+            # Enable WAL mode for better concurrency
+            cursor.execute("PRAGMA journal_mode=WAL;")
+            
+            # Disable synchronous writes temporarily for speed
+            cursor.execute("PRAGMA synchronous=OFF;")
+            
+            # Increase cache size
+            cursor.execute("PRAGMA cache_size=10000;")
+            
+            connection.commit()
+            cursor.close()
+            connection.close()
+            
+            logger.info("SQLite database optimized for import")
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error optimizing database: {str(e)}")
+        return False
+
+def restore_db_after_import():
+    """Restore database settings after import"""
+    try:
+        if is_production():
+            # PostgreSQL restore
+            engine = db.engine
+            connection = engine.raw_connection()
+            cursor = connection.cursor()
+            
+            # Re-enable triggers
+            cursor.execute("SET session_replication_role = 'origin';")
+            
+            # Reset work memory
+            cursor.execute("RESET work_mem;")
+            
+            # Re-enable synchronous commit
+            cursor.execute("RESET synchronous_commit;")
+            
+            connection.commit()
+            cursor.close()
+            connection.close()
+            
+            logger.info("PostgreSQL database settings restored after import")
+        else:
+            # SQLite restore
+            engine = db.engine
+            connection = engine.raw_connection()
+            cursor = connection.cursor()
+            
+            # Re-enable synchronous writes
+            cursor.execute("PRAGMA synchronous=NORMAL;")
+            
+            # Reset cache size
+            cursor.execute("PRAGMA cache_size=-2000;")
+            
+            connection.commit()
+            cursor.close()
+            connection.close()
+            
+            logger.info("SQLite database settings restored after import")
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error restoring database settings: {str(e)}")
+        return False
 
 # Function to save import status
 def save_import_status(import_id, status_data):
@@ -265,13 +421,13 @@ def preview_sales_data():
         
         # Check if products exist
         product_names = df['Product Name'].unique()
-        existing_products = Product.query.filter(Product.name.in_(product_names)).all()
+        existing_products = Product.query.filter(Product.name.in_(product_names)).filter_by(user_id=current_user.id).all()
         existing_product_names = [p.name for p in existing_products]
         missing_products = [name for name in product_names if name not in existing_product_names]
         
         # Check if customers exist
         customer_names = df['Customer Name'].unique()
-        existing_customers = Customer.query.filter(Customer.name.in_(customer_names)).all()
+        existing_customers = Customer.query.filter(Customer.name.in_(customer_names)).filter_by(user_id=current_user.id).all()
         existing_customer_names = [c.name for c in existing_customers]
         missing_customers = [name for name in customer_names if name not in existing_customer_names]
         
@@ -290,14 +446,132 @@ def preview_sales_data():
         flash(f'Error processing file: {str(e)}', 'error')
         return redirect(url_for('import_bp.import_sales'))
 
-# Process sales import
+# Add this debugging function to help diagnose import issues
+def debug_dataframe(df, import_id):
+    """Log dataframe information for debugging"""
+    try:
+        logger.info(f"Import {import_id} - DataFrame info:")
+        logger.info(f"Shape: {df.shape}")
+        logger.info(f"Columns: {df.columns.tolist()}")
+        logger.info(f"First 5 rows: {df.head(5).to_dict('records')}")
+        
+        # Check for NaN values
+        nan_counts = df.isna().sum()
+        if nan_counts.sum() > 0:
+            logger.info(f"NaN counts: {nan_counts.to_dict()}")
+            
+        return True
+    except Exception as e:
+        logger.error(f"Error debugging dataframe: {str(e)}")
+        return False
+
+# Helper function to find or create a vendor with proper error handling
+def find_or_create_vendor(vendor_name, user_id, import_id):
+    """Find an existing vendor or create a new one with proper error handling"""
+    try:
+        # IMPORTANT: Only search within the current user's vendors
+        # First, try to find by exact name match for this user
+        vendor = Vendor.query.filter_by(name=vendor_name, user_id=user_id).first()
+        
+        if vendor:
+            logger.info(f"Import {import_id} - Found existing vendor: {vendor_name} (ID: {vendor.id}) for user {user_id}")
+            return vendor, False  # Found existing vendor
+        
+        # Try case-insensitive search as fallback (still within user's data)
+        vendor = Vendor.query.filter(
+            Vendor.name.ilike(f"%{vendor_name}%"), 
+            Vendor.user_id == user_id
+        ).first()
+        
+        if vendor:
+            logger.info(f"Import {import_id} - Found similar vendor: {vendor.name} for {vendor_name} (ID: {vendor.id}) for user {user_id}")
+            return vendor, False  # Found similar vendor
+        
+        # Create a new vendor with a guaranteed unique GST ID
+        gst_id = generate_unique_gst_id("VEND", user_id)
+        
+        vendor = Vendor(
+            user_id=user_id,
+            name=vendor_name,
+            gst_id=gst_id,
+            location="Unknown",  # Placeholder location
+            contact_person="",
+            phone="",
+            about=f"Imported from Excel on {datetime.now().strftime('%Y-%m-%d')}"
+        )
+        
+        db.session.add(vendor)
+        db.session.flush()  # Get ID without committing
+        
+        logger.info(f"Import {import_id} - Created new vendor: {vendor_name} with GST ID: {gst_id} (ID: {vendor.id}) for user {user_id}")
+        return vendor, True  # Created new vendor
+        
+    except Exception as e:
+        logger.error(f"Error finding/creating vendor {vendor_name} for user {user_id}: {str(e)}")
+        raise  # Re-raise to be handled by the caller
+
+# Helper function to find or create a customer with proper error handling
+def find_or_create_customer(customer_name, user_id, import_id):
+    """Find an existing customer or create a new one with proper error handling"""
+    try:
+        # IMPORTANT: Only search within the current user's customers
+        # First, try to find by exact name match for this user
+        customer = Customer.query.filter_by(name=customer_name, user_id=user_id).first()
+        
+        if customer:
+            logger.info(f"Import {import_id} - Found existing customer: {customer_name} (ID: {customer.id}) for user {user_id}")
+            return customer, False  # Found existing customer
+        
+        # Try case-insensitive search as fallback (still within user's data)
+        customer = Customer.query.filter(
+            Customer.name.ilike(f"%{customer_name}%"), 
+            Customer.user_id == user_id
+        ).first()
+        
+        if customer:
+            logger.info(f"Import {import_id} - Found similar customer: {customer.name} for {customer_name} (ID: {customer.id}) for user {user_id}")
+            return customer, False  # Found similar customer
+        
+        # Create a new customer with a guaranteed unique GST ID
+        gst_id = generate_unique_gst_id("CUST", user_id)
+        
+        customer = Customer(
+            user_id=user_id,
+            name=customer_name,
+            gst_id=gst_id,
+            location="Unknown",  # Placeholder location
+            contact_person="",
+            phone="",
+            about=f"Imported from Excel on {datetime.now().strftime('%Y-%m-%d')}"
+        )
+        
+        db.session.add(customer)
+        db.session.flush()  # Get ID without committing
+        
+        logger.info(f"Import {import_id} - Created new customer: {customer_name} with GST ID: {gst_id} (ID: {customer.id}) for user {user_id}")
+        return customer, True  # Created new customer
+        
+    except Exception as e:
+        logger.error(f"Error finding/creating customer {customer_name} for user {user_id}: {str(e)}")
+        raise  # Re-raise to be handled by the caller
+
+# Modify the process_sales_import_task function to fix small file handling
 def process_sales_import_task(import_id, file_path, date_format, create_missing):
     try:
+        # Get the current user ID from the import_id (format: "sales_TIMESTAMP_USER_ID")
+        user_id = import_id.split('_')[-1]
+        
+        # Optimize database for import
+        optimize_db_for_import()
+        
         # Read the file
         if file_path.endswith('.csv'):
             df = pd.read_csv(file_path)
         else:
             df = pd.read_excel(file_path)
+        
+        # Debug the dataframe
+        debug_dataframe(df, import_id)
         
         # Parse dates first
         df['parsed_date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d', errors='coerce')
@@ -309,7 +583,7 @@ def process_sales_import_task(import_id, file_path, date_format, create_missing)
         import_results = {
             'status': 'processing',
             'progress': 10,
-            'message': "Processing sales data...",
+            'message': f"Processing {total_rows} sales records...",
             'success': 0,
             'warnings': 0,
             'errors': 0,
@@ -319,16 +593,19 @@ def process_sales_import_task(import_id, file_path, date_format, create_missing)
         }
         save_import_status(import_id, import_results)
         
-        # Get existing products and customers
-        existing_products = {p.name: p for p in Product.query.all()}
-        existing_customers = {c.name: c for c in Customer.query.all()}
+        # Get existing products for this user
+        existing_products = {p.name: p for p in Product.query.filter_by(user_id=user_id).all()}
         
         # Process data in smaller chunks
-        chunk_size = 25  # Smaller chunks for production
+        chunk_size = min(10, max(1, total_rows // 10))  # Adjust chunk size based on total rows
         chunks = list(process_dataframe_in_chunks(df, chunk_size))
         total_chunks = len(chunks)
         
+        logger.info(f"Import {import_id} - Processing {total_chunks} chunks with size {chunk_size}")
+        
         for chunk_idx, chunk in enumerate(chunks):
+            # Add this at the beginning of each chunk processing loop in both functions
+            db_session_valid = True
             try:
                 # Update progress
                 progress = 10 + int(80 * chunk_idx / total_chunks)
@@ -336,40 +613,37 @@ def process_sales_import_task(import_id, file_path, date_format, create_missing)
                 import_results['message'] = f"Processing chunk {chunk_idx + 1} of {total_chunks}..."
                 save_import_status(import_id, import_results)
                 
+                # Log chunk info
+                logger.info(f"Import {import_id} - Processing chunk {chunk_idx + 1}/{total_chunks} with {len(chunk)} rows")
+                
                 # Group by invoice number and customer name
                 grouped = chunk.groupby(['Invoice Number', 'Customer Name'])
                 
                 for (invoice_number, customer_name), group_data in grouped:
                     try:
-                        # Get or create customer
-                        if customer_name in existing_customers:
-                            customer = existing_customers[customer_name]
-                        elif create_missing:
-                            # Create a new customer with placeholder data
-                            customer = Customer(
-                                name=customer_name,
-                                gst_id=f"CUST{len(existing_customers) + 1}",  # Placeholder GST ID
-                                location="Unknown",  # Placeholder location
-                                contact_person="",
-                                phone="",
-                                about=f"Imported from Excel on {datetime.now().strftime('%Y-%m-%d')}"
-                            )
-                            db.session.add(customer)
-                            db.session.flush()  # Get ID without committing
-                            existing_customers[customer_name] = customer
-                            import_results['new_customers'].append(customer_name)
-                        else:
-                            import_results['errors'] += 1
-                            import_results['errors_list'].append(f"Customer not found: {customer_name}")
-                            continue
+                        logger.info(f"Import {import_id} - Processing invoice {invoice_number} for customer {customer_name}")
                         
-                        # Remove the existing parsed_dates logic in the grouped loop and replace with:
+                        # Get or create customer
+                        if create_missing:
+                            customer, is_new = find_or_create_customer(customer_name, user_id, import_id)
+                            if is_new:
+                                import_results['new_customers'].append(customer_name)
+                        else:
+                            # Only look for existing customer
+                            customer = Customer.query.filter_by(name=customer_name, user_id=user_id).first()
+                            if not customer:
+                                import_results['errors'] += 1
+                                import_results['errors_list'].append(f"Customer not found: {customer_name}")
+                                logger.warning(f"Import {import_id} - Customer not found and not creating: {customer_name}")
+                                continue
+                        
                         # Get the first valid date from the group
                         valid_dates = group_data['parsed_date'].dropna().tolist()
                         if valid_dates:
                             sale_date = valid_dates[0]
                         else:
                             sale_date = datetime.now()
+                            logger.warning(f"Import {import_id} - Using current date for invoice {invoice_number} due to missing date")
                         
                         # Calculate total amount for the sale
                         total_amount = 0
@@ -377,6 +651,7 @@ def process_sales_import_task(import_id, file_path, date_format, create_missing)
                         
                         # Create sale
                         sale = Sale(
+                            user_id=user_id,  # Associate with the current user
                             customer_id=customer.id,
                             sale_date=sale_date,
                             delivery_charges=delivery_charges,
@@ -384,6 +659,7 @@ def process_sales_import_task(import_id, file_path, date_format, create_missing)
                         )
                         db.session.add(sale)
                         db.session.flush()  # Get ID without committing
+                        logger.info(f"Import {import_id} - Created sale record for invoice {invoice_number}")
                         
                         # Process each item in the sale
                         for _, row in group_data.iterrows():
@@ -392,12 +668,14 @@ def process_sales_import_task(import_id, file_path, date_format, create_missing)
                             # Get or create product
                             if product_name in existing_products:
                                 product = existing_products[product_name]
+                                logger.info(f"Import {import_id} - Using existing product: {product_name}")
                             elif create_missing:
                                 # Generate a unique product ID
                                 product_id = generate_product_id(product_name)
                                 
                                 # Create a new product with placeholder data
                                 product = Product(
+                                    user_id=user_id,  # Associate with the current user
                                     product_id=product_id,
                                     name=product_name,
                                     quantity=0,  # Initial quantity
@@ -408,57 +686,90 @@ def process_sales_import_task(import_id, file_path, date_format, create_missing)
                                 db.session.flush()  # Get ID without committing
                                 existing_products[product_name] = product
                                 import_results['new_products'].append(product_name)
+                                logger.info(f"Import {import_id} - Created new product: {product_name}")
                             else:
                                 import_results['errors'] += 1
                                 import_results['errors_list'].append(f"Product not found: {product_name}")
+                                logger.warning(f"Import {import_id} - Product not found and not creating: {product_name}")
                                 continue
                             
                             # Calculate item price
-                            quantity = int(row['Quantity'])
-                            total_amount_item = float(row['Total Amount'])
-                            gst_percentage = 18.0  # Default GST
-                            discount_percentage = 0.0  # Default discount
-                            
-                            # Calculate pre-tax amount
-                            pre_tax_amount = total_amount_item / (1 + gst_percentage/100)
-                            unit_price = pre_tax_amount / quantity
-                            
-                            # Check if enough stock
-                            if product.quantity < quantity:
-                                import_results['warnings'] += 1
-                                import_results['errors_list'].append(f"Warning: Not enough stock for product {product_name}. Current: {product.quantity}, Required: {quantity}")
-                            
-                            # Update product quantity
-                            product.quantity -= quantity
-                            
-                            # Create sale item
-                            sale_item = SaleItem(
-                                sale_id=sale.id,
-                                product_id=product.id,
-                                quantity=quantity,
-                                gst_percentage=gst_percentage,
-                                discount_percentage=discount_percentage,
-                                unit_price=unit_price,
-                                total_price=total_amount_item
-                            )
-                            db.session.add(sale_item)
-                            
-                            # Add to total amount
-                            total_amount += total_amount_item
+                            try:
+                                quantity = int(float(row['Quantity']))
+                                total_amount_item = float(row['Total Amount'])
+                                gst_percentage = 18.0  # Default GST
+                                discount_percentage = 0.0  # Default discount
+                                
+                                # Calculate pre-tax amount
+                                pre_tax_amount = total_amount_item / (1 + gst_percentage/100)
+                                unit_price = pre_tax_amount / quantity if quantity > 0 else 0
+                                
+                                # Check if enough stock
+                                if product.quantity < quantity:
+                                    import_results['warnings'] += 1
+                                    import_results['errors_list'].append(f"Warning: Not enough stock for product {product_name}. Current: {product.quantity}, Required: {quantity}")
+                                    logger.warning(f"Import {import_id} - Not enough stock for product {product_name}")
+                                
+                                # Update product quantity
+                                product.quantity -= quantity
+                                
+                                # Create sale item
+                                sale_item = SaleItem(
+                                    sale_id=sale.id,
+                                    product_id=product.id,
+                                    quantity=quantity,
+                                    gst_percentage=gst_percentage,
+                                    discount_percentage=discount_percentage,
+                                    unit_price=unit_price,
+                                    total_price=total_amount_item
+                                )
+                                db.session.add(sale_item)
+                                logger.info(f"Import {import_id} - Added sale item: {product_name}, qty: {quantity}")
+                                
+                                # Add to total amount
+                                total_amount += total_amount_item
+                            except Exception as e:
+                                import_results['errors'] += 1
+                                import_results['errors_list'].append(f"Error processing item {product_name}: {str(e)}")
+                                logger.error(f"Import {import_id} - Error processing item {product_name}: {str(e)}")
+                                continue
                         
                         # Update sale total amount
                         sale.total_amount = total_amount
                         
                         import_results['success'] += 1
+                        logger.info(f"Import {import_id} - Successfully processed invoice {invoice_number}, total: {total_amount}")
                         
                     except Exception as e:
-                        logger.error(f"Error processing sale {invoice_number}: {str(e)}")
+                        logger.error(f"Error processing sale: {str(e)}")
                         import_results['errors'] += 1
-                        import_results['errors_list'].append(f"Error importing sale {invoice_number}: {str(e)}")
+                        import_results['errors_list'].append(f"Error importing sale: {str(e)}")
+                        # Check if this is a transaction error that requires rollback
+                        if "transaction has been rolled back" in str(e) or "IntegrityError" in str(e):
+                            db.session.rollback()
+                            db_session_valid = False
+                            logger.warning("Transaction rolled back, will skip remaining items in this chunk")
+                            break  # Exit the grouped data loop
                         continue
                 
-                # Commit after each chunk
-                db.session.commit()
+                # After the grouped data loop in both functions
+                if not db_session_valid:
+                    logger.warning(f"Import {import_id} - Skipping commit for chunk {chunk_idx + 1} due to transaction errors")
+                    continue  # Skip to the next chunk
+                
+                # Commit after each chunk - update this in both functions
+                if db_session_valid:
+                    try:
+                        db.session.commit()
+                        logger.info(f"Import {import_id} - Committed chunk {chunk_idx + 1}")
+                    except Exception as e:
+                        db.session.rollback()
+                        logger.error(f"Error committing chunk {chunk_idx + 1}: {str(e)}")
+                        import_results['errors'] += 1
+                        import_results['errors_list'].append(f"Error committing chunk: {str(e)}")
+                else:
+                    # Reset the session for the next chunk
+                    db.session.rollback()
                 
                 # Force garbage collection after each chunk
                 gc.collect()
@@ -472,12 +783,16 @@ def process_sales_import_task(import_id, file_path, date_format, create_missing)
         # Update final status
         import_results['status'] = 'completed'
         import_results['progress'] = 100
-        import_results['message'] = "Import completed successfully"
+        import_results['message'] = f"Import completed successfully. Imported {import_results['success']} sales."
         save_import_status(import_id, import_results)
+        logger.info(f"Import {import_id} - Completed with {import_results['success']} successes, {import_results['warnings']} warnings, {import_results['errors']} errors")
         
         # Clean up the file
         if os.path.exists(file_path):
             os.remove(file_path)
+        
+        # Restore database settings
+        restore_db_after_import()
             
     except Exception as e:
         logger.error(f"Error in sales import: {str(e)}")
@@ -489,7 +804,26 @@ def process_sales_import_task(import_id, file_path, date_format, create_missing)
         save_import_status(import_id, import_results)
         if os.path.exists(file_path):
             os.remove(file_path)
+        
+        # Make sure to restore database settings even on error
+        restore_db_after_import()
 
+# Modify the process_sales_import_background function to properly use app context
+def process_sales_import_background(app, import_id, file_path, date_format, create_missing):
+    """Process sales import in a background thread with proper app context"""
+    with app.app_context():
+        try:
+            process_sales_import_task(import_id, file_path, date_format, create_missing)
+        except Exception as e:
+            logger.error(f"Background task error: {str(e)}")
+            import_results = {
+                'status': 'error',
+                'message': f"Error: {str(e)}",
+                'errors_list': [str(e)]
+            }
+            save_import_status(import_id, import_results)
+
+# Update the process_sales_import route to use the background function
 @import_bp.route('/import/sales/process', methods=['POST'])
 def process_sales_import():
     file_path = request.form.get('file_path')
@@ -501,8 +835,8 @@ def process_sales_import():
         return redirect(url_for('import_bp.import_sales'))
     
     try:
-        # Generate a unique import ID
-        import_id = f"sales_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        # Generate a unique import ID that includes the user ID
+        import_id = f"sales_{datetime.now().strftime('%Y%m%d%H%M%S')}_{current_user.id}"
         
         # Initialize status
         save_import_status(import_id, {
@@ -511,10 +845,18 @@ def process_sales_import():
             'message': 'Starting import...'
         })
         
-        # Process the import directly (synchronously)
-        process_sales_import_task(import_id, file_path, date_format, create_missing)
+        # Get the current app
+        app = current_app._get_current_object()
         
-        # Return the status page
+        # Start the import process in a background thread with app context
+        thread = threading.Thread(
+            target=process_sales_import_background,
+            args=(app, import_id, file_path, date_format, create_missing)
+        )
+        thread.daemon = True
+        thread.start()
+        
+        # Return the status page immediately
         return render_template('import_status.html', import_id=import_id, import_type='sales')
         
     except Exception as e:
@@ -657,15 +999,16 @@ def preview_purchases_data():
         
         # Check if products exist
         product_names = df['Product Name'].unique()
-        existing_products = Product.query.filter(Product.name.in_(product_names)).all()
+        existing_products = Product.query.filter(Product.name.in_(product_names)).filter_by(user_id=current_user.id).all()
         existing_product_names = [p.name for p in existing_products]
         missing_products = [name for name in product_names if name not in existing_product_names]
         
+        # In the preview_purchases_data function, replace the vendor check with:
         # Check if vendors exist
         vendor_names = df['Vendor Name'].unique()
-        existing_vendors = Vendor.query.all()
-        existing_vendor_names = [v.name.strip().lower() for v in existing_vendors]
-        missing_vendors = [name for name in vendor_names if name.strip().lower() not in existing_vendor_names]
+        existing_vendors = Vendor.query.filter_by(user_id=current_user.id).all()
+        existing_vendor_names = [v.name for v in existing_vendors]
+        missing_vendors = [name for name in vendor_names if name not in existing_vendor_names]
         
         return render_template('import_purchases.html', 
                               step=3, 
@@ -684,31 +1027,32 @@ def preview_purchases_data():
 # Process purchases import
 def process_purchases_import_task(import_id, file_path, date_format, create_missing):
     try:
+        # Get the current user ID from the import_id (format: "purchases_TIMESTAMP_USER_ID")
+        user_id = import_id.split('_')[-1]
+        
+        # Optimize database for import
+        optimize_db_for_import()
+        
         # Read the file
         if file_path.endswith('.csv'):
             df = pd.read_csv(file_path)
         else:
             df = pd.read_excel(file_path)
         
+        # Debug the dataframe
+        debug_dataframe(df, import_id)
+        
+        # Parse dates first
+        df['parsed_date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d', errors='coerce')
+        
         total_rows = len(df)
         logger.info(f"Processing {total_rows} rows for purchases import {import_id}")
-        
-        # Parse dates
-        parsed_dates = []
-        for date_str in df['Date']:
-            try:
-                parsed_date = parse_date(str(date_str), date_format)
-                parsed_dates.append(parsed_date)
-            except ValueError:
-                parsed_dates.append(None)
-        
-        df['parsed_date'] = parsed_dates
         
         # Initialize results
         import_results = {
             'status': 'processing',
             'progress': 10,
-            'message': "Processing purchase data...",
+            'message': f"Processing {total_rows} purchase records...",
             'success': 0,
             'warnings': 0,
             'errors': 0,
@@ -718,46 +1062,19 @@ def process_purchases_import_task(import_id, file_path, date_format, create_miss
         }
         save_import_status(import_id, import_results)
         
-        # Get existing products and vendors
-        all_products = {p.name: p for p in Product.query.all()}
+        # Get existing products for this user
+        existing_products = {p.name: p for p in Product.query.filter_by(user_id=user_id).all()}
         
-        # Get all vendors and create a case-insensitive lookup dictionary
-        existing_vendors = Vendor.query.all()
-        all_vendors = {}
-        for v in existing_vendors:
-            all_vendors[v.name] = v
-            all_vendors[v.name.strip().lower()] = v
-        
-        # Pre-create all vendors from the import file that don't exist yet
-        vendor_names = df['Vendor Name'].unique()
-        for vendor_name in vendor_names:
-            vendor_key = vendor_name.strip().lower()
-            if vendor_name not in all_vendors and vendor_key not in all_vendors:
-                # Create a new vendor with data from the import
-                vendor = Vendor(
-                    name=vendor_name,
-                    gst_id=f"VEND{len(all_vendors) // 2 + 1}",  # Generate a unique GST ID
-                    location="Unknown",  # Placeholder location
-                    contact_person="",
-                    phone="",
-                    about=f"Auto-created from import on {datetime.now().strftime('%Y-%m-%d')}"
-                )
-                db.session.add(vendor)
-                import_results['new_vendors'].append(vendor_name)
-                
-                # Add to the vendors dictionary
-                all_vendors[vendor_name] = vendor
-                all_vendors[vendor_key] = vendor
-        
-        # Flush to get IDs for the new vendors
-        db.session.flush()
-        
-        # Process data in smaller chunks for production
-        chunk_size = 25  # Smaller chunks for production
+        # Process data in smaller chunks
+        chunk_size = min(10, max(1, total_rows // 10))  # Adjust chunk size based on total rows
         chunks = list(process_dataframe_in_chunks(df, chunk_size))
         total_chunks = len(chunks)
         
+        logger.info(f"Import {import_id} - Processing {total_chunks} chunks with size {chunk_size}")
+        
         for chunk_idx, chunk in enumerate(chunks):
+            # Add this at the beginning of each chunk processing loop in both functions
+            db_session_valid = True
             try:
                 # Update progress
                 progress = 10 + int(80 * chunk_idx / total_chunks)
@@ -765,62 +1082,77 @@ def process_purchases_import_task(import_id, file_path, date_format, create_miss
                 import_results['message'] = f"Processing chunk {chunk_idx + 1} of {total_chunks}..."
                 save_import_status(import_id, import_results)
                 
-                # Group by order ID and vendor
+                # Log chunk info
+                logger.info(f"Import {import_id} - Processing chunk {chunk_idx + 1}/{total_chunks} with {len(chunk)} rows")
+                
+                # Group by order ID and vendor name
                 grouped = chunk.groupby(['Order ID', 'Vendor Name'])
                 
                 for (order_id, vendor_name), group_data in grouped:
                     try:
-                        # Get the vendor (should always exist now)
-                        vendor_key = vendor_name.strip().lower()
-                        if vendor_name in all_vendors:
-                            vendor = all_vendors[vendor_name]
-                        elif vendor_key in all_vendors:
-                            vendor = all_vendors[vendor_key]
+                        logger.info(f"Import {import_id} - Processing order {order_id} from vendor {vendor_name}")
+                        
+                        # Get or create vendor
+                        if create_missing:
+                            try:
+                                logger.info(f"Import {import_id} - Attempting to find or create vendor: {vendor_name}")
+                                vendor, is_new = find_or_create_vendor(vendor_name, user_id, import_id)
+                                if is_new:
+                                    import_results['new_vendors'].append(vendor_name)
+                                    logger.info(f"Import {import_id} - Successfully created new vendor: {vendor_name}")
+                            except Exception as e:
+                                logger.error(f"Import {import_id} - Error creating vendor {vendor_name}: {str(e)}")
+                                import_results['errors'] += 1
+                                import_results['errors_list'].append(f"Error creating vendor {vendor_name}: {str(e)}")
+                                continue
                         else:
-                            # This should never happen now, but just in case
-                            import_results['errors'] += 1
-                            import_results['errors_list'].append(f"Vendor not found: {vendor_name}")
-                            continue
+                            # Only look for existing vendor
+                            vendor = Vendor.query.filter_by(name=vendor_name, user_id=user_id).first()
+                            if not vendor:
+                                import_results['errors'] += 1
+                                import_results['errors_list'].append(f"Vendor not found: {vendor_name}")
+                                logger.warning(f"Import {import_id} - Vendor not found and not creating: {vendor_name}")
+                                continue
                         
                         # Get the first valid date from the group
-                        valid_dates = [d for d in group_data['parsed_date'] if pd.notna(d)]
+                        valid_dates = group_data['parsed_date'].dropna().tolist()
                         if valid_dates:
                             purchase_date = valid_dates[0]
                         else:
                             purchase_date = datetime.now()
-                        
-                        # Set default status to Delivered
-                        status = "Delivered"
+                            logger.warning(f"Import {import_id} - Using current date for order {order_id} due to missing date")
                         
                         # Calculate total amount for the purchase
                         total_amount = 0
-                        delivery_charges = 0  # Default to 0, can be updated if in the data
                         
                         # Create purchase
                         purchase = Purchase(
+                            user_id=user_id,  # Associate with the current user
                             vendor_id=vendor.id,
                             purchase_date=purchase_date,
                             order_id=order_id,
-                            delivery_charges=delivery_charges,
-                            total_amount=0,  # Will update after calculating items
-                            status=status
+                            status="Delivered",  # Default status
+                            total_amount=0  # Will update after calculating items
                         )
                         db.session.add(purchase)
                         db.session.flush()  # Get ID without committing
+                        logger.info(f"Import {import_id} - Created purchase record for order {order_id}")
                         
                         # Process each item in the purchase
                         for _, row in group_data.iterrows():
                             product_name = row['Product Name']
                             
                             # Get or create product
-                            if product_name in all_products:
-                                product = all_products[product_name]
+                            if product_name in existing_products:
+                                product = existing_products[product_name]
+                                logger.info(f"Import {import_id} - Using existing product: {product_name}")
                             elif create_missing:
                                 # Generate a unique product ID
                                 product_id = generate_product_id(product_name)
                                 
                                 # Create a new product with placeholder data
                                 product = Product(
+                                    user_id=user_id,  # Associate with the current user
                                     product_id=product_id,
                                     name=product_name,
                                     quantity=0,  # Initial quantity
@@ -829,60 +1161,92 @@ def process_purchases_import_task(import_id, file_path, date_format, create_miss
                                 )
                                 db.session.add(product)
                                 db.session.flush()  # Get ID without committing
-                                all_products[product_name] = product
+                                existing_products[product_name] = product
                                 import_results['new_products'].append(product_name)
+                                logger.info(f"Import {import_id} - Created new product: {product_name}")
                             else:
                                 import_results['errors'] += 1
                                 import_results['errors_list'].append(f"Product not found: {product_name}")
+                                logger.warning(f"Import {import_id} - Product not found and not creating: {product_name}")
                                 continue
                             
                             # Calculate item price
-                            quantity = int(row['Quantity'])
-                            total_amount_item = float(row['Total Amount'])
-                            gst_percentage = 18.0  # Default GST
-                            
-                            # Calculate pre-tax amount
-                            pre_tax_amount = total_amount_item / (1 + gst_percentage/100)
-                            unit_price = pre_tax_amount / quantity
-                            
-                            # Create purchase item
-                            purchase_item = PurchaseItem(
-                                purchase_id=purchase.id,
-                                product_id=product.id,
-                                quantity=quantity,
-                                gst_percentage=gst_percentage,
-                                unit_price=unit_price,
-                                total_price=total_amount_item
-                            )
-                            db.session.add(purchase_item)
-                            
-                            # Update product quantity and cost
-                            old_quantity = product.quantity
-                            product.quantity += quantity
-                            
-                            # Update cost_per_unit as weighted average
-                            if product.quantity > 0:
-                                if old_quantity > 0 and product.cost_per_unit > 0:
-                                    product.cost_per_unit = ((product.cost_per_unit * old_quantity) + (unit_price * quantity)) / product.quantity
+                            try:
+                                quantity = int(float(row['Quantity']))
+                                total_amount_item = float(row['Total Amount'])
+                                gst_percentage = 18.0  # Default GST
+                                
+                                # Calculate pre-tax amount
+                                pre_tax_amount = total_amount_item / (1 + gst_percentage/100)
+                                unit_price = pre_tax_amount / quantity if quantity > 0 else 0
+                                
+                                # Update product quantity and cost_per_unit
+                                product.quantity += quantity
+                                
+                                # Update cost_per_unit as weighted average
+                                if product.cost_per_unit > 0:
+                                    old_total_value = product.cost_per_unit * (product.quantity - quantity)
+                                    new_value = unit_price * quantity
+                                    product.cost_per_unit = (old_total_value + new_value) / product.quantity
                                 else:
                                     product.cost_per_unit = unit_price
-                            
-                            # Add to total amount
-                            total_amount += total_amount_item
+                                
+                                # Create purchase item
+                                purchase_item = PurchaseItem(
+                                    purchase_id=purchase.id,
+                                    product_id=product.id,
+                                    quantity=quantity,
+                                    gst_percentage=gst_percentage,
+                                    unit_price=unit_price,
+                                    total_price=total_amount_item
+                                )
+                                db.session.add(purchase_item)
+                                logger.info(f"Import {import_id} - Added purchase item: {product_name}, qty: {quantity}")
+                                
+                                # Add to total amount
+                                total_amount += total_amount_item
+                            except Exception as e:
+                                import_results['errors'] += 1
+                                import_results['errors_list'].append(f"Error processing item {product_name}: {str(e)}")
+                                logger.error(f"Import {import_id} - Error processing item {product_name}: {str(e)}")
+                                continue
                         
                         # Update purchase total amount
                         purchase.total_amount = total_amount
                         
                         import_results['success'] += 1
+                        logger.info(f"Import {import_id} - Successfully processed order {order_id}, total: {total_amount}")
                         
                     except Exception as e:
-                        logger.error(f"Error processing purchase {order_id}: {str(e)}")
+                        logger.error(f"Error processing purchase: {str(e)}")
                         import_results['errors'] += 1
-                        import_results['errors_list'].append(f"Error importing purchase {order_id}: {str(e)}")
+                        import_results['errors_list'].append(f"Error importing purchase: {str(e)}")
+                        # Check if this is a transaction error that requires rollback
+                        if "transaction has been rolled back" in str(e) or "IntegrityError" in str(e):
+                            db.session.rollback()
+                            db_session_valid = False
+                            logger.warning("Transaction rolled back, will skip remaining items in this chunk")
+                            break  # Exit the grouped data loop
                         continue
                 
-                # Commit after each chunk
-                db.session.commit()
+                # After the grouped data loop in both functions
+                if not db_session_valid:
+                    logger.warning(f"Import {import_id} - Skipping commit for chunk {chunk_idx + 1} due to transaction errors")
+                    continue  # Skip to the next chunk
+                
+                # Commit after each chunk - update this in both functions
+                if db_session_valid:
+                    try:
+                        db.session.commit()
+                        logger.info(f"Import {import_id} - Committed chunk {chunk_idx + 1}")
+                    except Exception as e:
+                        db.session.rollback()
+                        logger.error(f"Error committing chunk {chunk_idx + 1}: {str(e)}")
+                        import_results['errors'] += 1
+                        import_results['errors_list'].append(f"Error committing chunk: {str(e)}")
+                else:
+                    # Reset the session for the next chunk
+                    db.session.rollback()
                 
                 # Force garbage collection after each chunk
                 gc.collect()
@@ -896,12 +1260,16 @@ def process_purchases_import_task(import_id, file_path, date_format, create_miss
         # Update final status
         import_results['status'] = 'completed'
         import_results['progress'] = 100
-        import_results['message'] = "Import completed successfully"
+        import_results['message'] = f"Import completed successfully. Imported {import_results['success']} purchases."
         save_import_status(import_id, import_results)
+        logger.info(f"Import {import_id} - Completed with {import_results['success']} successes, {import_results['warnings']} warnings, {import_results['errors']} errors")
         
         # Clean up the file
         if os.path.exists(file_path):
             os.remove(file_path)
+        
+        # Restore database settings
+        restore_db_after_import()
             
     except Exception as e:
         logger.error(f"Error in purchases import: {str(e)}")
@@ -913,20 +1281,41 @@ def process_purchases_import_task(import_id, file_path, date_format, create_miss
         save_import_status(import_id, import_results)
         if os.path.exists(file_path):
             os.remove(file_path)
+        
+        # Make sure to restore database settings even on error
+        restore_db_after_import()
 
+# Modify the process_purchases_import_background function similarly
+def process_purchases_import_background(app, import_id, file_path, date_format, create_missing):
+    """Process purchases import in a background thread with proper app context"""
+    with app.app_context():
+        try:
+            process_purchases_import_task(import_id, file_path, date_format, create_missing)
+        except Exception as e:
+            logger.error(f"Background task error: {str(e)}")
+            import_results = {
+                'status': 'error',
+                'message': f"Error: {str(e)}",
+                'errors_list': [str(e)]
+            }
+            save_import_status(import_id, import_results)
+
+# Update the process_purchases_import route similarly
 @import_bp.route('/import/purchases/process', methods=['POST'])
 def process_purchases_import():
     file_path = request.form.get('file_path')
     date_format = request.form.get('date_format')
     create_missing = request.form.get('create_missing') == 'yes'
     
+    logger.info(f"Processing purchases import with create_missing={create_missing} for user_id={current_user.id}")
+    
     if not file_path or not os.path.exists(file_path):
         flash('File not found. Please upload again.', 'error')
         return redirect(url_for('import_bp.import_purchases'))
     
     try:
-        # Generate a unique import ID
-        import_id = f"purchases_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        # Generate a unique import ID that includes the user ID
+        import_id = f"purchases_{datetime.now().strftime('%Y%m%d%H%M%S')}_{current_user.id}"
         
         # Initialize status
         save_import_status(import_id, {
@@ -935,10 +1324,18 @@ def process_purchases_import():
             'message': 'Starting import...'
         })
         
-        # Process the import directly (synchronously)
-        process_purchases_import_task(import_id, file_path, date_format, create_missing)
+        # Get the current app
+        app = current_app._get_current_object()
         
-        # Return the status page
+        # Start the import process in a background thread with app context
+        thread = threading.Thread(
+            target=process_purchases_import_background,
+            args=(app, import_id, file_path, date_format, create_missing)
+        )
+        thread.daemon = True
+        thread.start()
+        
+        # Return the status page immediately
         return render_template('import_status.html', import_id=import_id, import_type='purchases')
         
     except Exception as e:

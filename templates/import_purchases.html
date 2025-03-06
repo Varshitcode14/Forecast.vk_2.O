@@ -137,13 +137,22 @@
   {% if missing_products or missing_vendors %}
   <div class="warning-message">
     {% if missing_vendors %}
-    <div><strong>Note:</strong> All vendors will be automatically created during import.</div>
+    <div><strong>Note:</strong> The following vendors will be automatically created during import:</div>
+    <div style="max-height: 100px; overflow-y: auto; margin: 10px 0; padding: 5px; background: rgba(0,0,0,0.05);">
+      {% for vendor in missing_vendors %}
+      <span class="badge" style="background: rgba(255,193,7,0.2); color: #ffc107; margin: 2px; padding: 3px 6px; border-radius: 4px; display: inline-block;">{{ vendor }}</span>
+      {% endfor %}
+    </div>
     {% endif %}
     
     {% if missing_products %}
     <div>
       <strong>Warning:</strong> Some products in the import file do not exist in the system.
-      <div>Missing Products: {{ missing_products|join(', ') }}</div>
+      <div style="max-height: 100px; overflow-y: auto; margin: 10px 0; padding: 5px; background: rgba(0,0,0,0.05);">
+        {% for product in missing_products %}
+        <span class="badge" style="background: rgba(255,193,7,0.2); color: #ffc107; margin: 2px; padding: 3px 6px; border-radius: 4px; display: inline-block;">{{ product }}</span>
+        {% endfor %}
+      </div>
     </div>
     {% endif %}
   </div>
@@ -192,15 +201,15 @@
   <input type="hidden" name="file_path" value="{{ file_path }}">
   <input type="hidden" name="date_format" value="{{ date_format }}">
   
-  {% if missing_products %}
-  <div class="form-group">
-    <label for="create-missing">
-      <input type="checkbox" id="create-missing" name="create_missing" value="yes" checked>
-      Automatically create missing products
+  <div class="form-check mb-3" style="margin-top: 15px; padding: 10px; background-color: rgba(40, 167, 69, 0.1); border-left: 4px solid #28a745; border-radius: 4px;">
+    <input class="form-check-input" type="checkbox" value="yes" id="create_missing" name="create_missing" checked>
+    <label class="form-check-label" for="create_missing" style="font-weight: 500; color: #28a745;">
+        Create missing vendors and products automatically
     </label>
-    <div class="help-text">If checked, missing products will be created with placeholder data that you can update later.</div>
+    <div style="font-size: 0.9rem; margin-top: 5px; color: rgba(255, 255, 255, 0.7);">
+      <strong>Recommended:</strong> Keep this checked to automatically create any missing vendors and products during import.
+    </div>
   </div>
-  {% endif %}
   
   <div class="form-actions">
     <button type="button" class="btn btn-secondary" onclick="goToStep(2)">Back</button>
@@ -283,11 +292,13 @@
   {% if import_results.errors_list %}
   <div class="detail-section errors-list">
     <h4>Error Details</h4>
-    <ul>
-      {% for error in import_results.errors_list %}
-      <li>{{ error }}</li>
-      {% endfor %}
-    </ul>
+    <div style="max-height: 200px; overflow-y: auto; border: 1px solid rgba(220, 53, 69, 0.3); border-radius: 4px; padding: 10px;">
+      <ul>
+        {% for error in import_results.errors_list %}
+        <li>{{ error }}</li>
+        {% endfor %}
+      </ul>
+    </div>
   </div>
   {% endif %}
 </div>

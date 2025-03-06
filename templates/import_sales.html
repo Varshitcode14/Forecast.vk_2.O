@@ -6,13 +6,13 @@
 <section class="page-header">
 <!-- Loading Overlay -->
 <div class="loading-container" id="loading-overlay">
-  <div class="dot-wave">
-    <div class="dot"></div>
-    <div class="dot"></div>
-    <div class="dot"></div>
-    <div class="dot"></div>
-  </div>
-  <div class="loading-text">Processing your data...</div>
+<div class="dot-wave">
+  <div class="dot"></div>
+  <div class="dot"></div>
+  <div class="dot"></div>
+  <div class="dot"></div>
+</div>
+<div class="loading-text">Processing your data...</div>
 </div>
 <h2>Import Sales Data</h2>
 <p>Upload Excel files to import sales records</p>
@@ -47,33 +47,33 @@
 </div>
 <div class="card-body">
 <div class="upload-container">
-  <form id="upload-form" action="{{ url_for('import_bp.validate_sales_file') }}" method="post" enctype="multipart/form-data">
-    <div class="file-drop-area" id="drop-area">
-      <input class="file-input" type="file" name="file" id="file-input" accept=".xlsx,.xls,.csv" required>
-      <div class="file-msg">
-        <i class="file-icon">📄</i>
-        <span class="file-prompt">Drag & drop your Excel file here or click to browse</span>
-        <span class="file-name"></span>
-      </div>
+<form id="upload-form" action="{{ url_for('import_bp.validate_sales_file') }}" method="post" enctype="multipart/form-data">
+  <div class="file-drop-area" id="drop-area">
+    <input class="file-input" type="file" name="file" id="file-input" accept=".xlsx,.xls,.csv" required>
+    <div class="file-msg">
+      <i class="file-icon">📄</i>
+      <span class="file-prompt">Drag & drop your Excel file here or click to browse</span>
+      <span class="file-name"></span>
     </div>
-    <div class="upload-requirements">
-      <h4>File Requirements:</h4>
-      <p>Your Excel file must include the following columns:</p>
-      <ul>
-        <li><strong>Invoice Number</strong> - Unique identifier for the sale</li>
-        <li><strong>Date</strong> - Date of the sale</li>
-        <li><strong>Customer Name</strong> - Name of the customer</li>
-        <li><strong>Product Name</strong> - Name of the product</li>
-        <li><strong>Quantity</strong> - Number of units sold</li>
-        <li><strong>Total Amount</strong> - Total amount including GST</li>
-      </ul>
-      <p class="note">Note: GST will be calculated at 18% automatically.</p>
-    </div>
-    <div class="form-actions">
-      <a href="{{ url_for('import_bp.import_data') }}" class="btn btn-secondary">Back</a>
-      <button type="submit" class="btn" id="upload-btn" disabled>Continue to Date Format</button>
-    </div>
-  </form>
+  </div>
+  <div class="upload-requirements">
+    <h4>File Requirements:</h4>
+    <p>Your Excel file must include the following columns:</p>
+    <ul>
+      <li><strong>Invoice Number</strong> - Unique identifier for the sale</li>
+      <li><strong>Date</strong> - Date of the sale</li>
+      <li><strong>Customer Name</strong> - Name of the customer</li>
+      <li><strong>Product Name</strong> - Name of the product</li>
+      <li><strong>Quantity</strong> - Number of units sold</li>
+      <li><strong>Total Amount</strong> - Total amount including tax</li>
+    </ul>
+    <p class="note">Note: GST will be automatically calculated at 18% and all customers in the import file will be automatically created if they don't exist in the system.</p>
+  </div>
+  <div class="form-actions">
+    <a href="{{ url_for('import_bp.import_data') }}" class="btn btn-secondary">Back</a>
+    <button type="submit" class="btn" id="upload-btn" disabled>Continue to Date Format</button>
+  </div>
+</form>
 </div>
 </div>
 </div>
@@ -85,24 +85,24 @@
 </div>
 <div class="card-body">
 <form id="date-format-form" action="{{ url_for('import_bp.preview_sales_data') }}" method="post">
-  <input type="hidden" name="file_path" id="file-path" value="{{ file_path|default('') }}">
-  
-  <div class="form-group">
-    <label for="date-format">Select the date format used in your Excel file:</label>
-    <select id="date-format" name="date_format" class="form-control" required>
-      <option value="">-- Select Date Format --</option>
-      <option value="DD/MM/YYYY">DD/MM/YYYY (e.g., 31/12/2023)</option>
-      <option value="MM/DD/YYYY">MM/DD/YYYY (e.g., 12/31/2023)</option>
-      <option value="YYYY-MM-DD">YYYY-MM-DD (e.g., 2023-12-31)</option>
-      <option value="DD-MM-YYYY">DD-MM-YYYY (e.g., 31-12-2023)</option>
-      <option value="MM-DD-YYYY">MM-DD-YYYY (e.g., 12-31-2023)</option>
-    </select>
-  </div>
-  
-  <div class="form-actions">
-    <button type="button" class="btn btn-secondary" onclick="goToStep(1)">Back</button>
-    <button type="submit" class="btn">Preview Data</button>
-  </div>
+<input type="hidden" name="file_path" id="file-path" value="{{ file_path|default('') }}">
+
+<div class="form-group">
+  <label for="date-format">Select the date format used in your Excel file:</label>
+  <select id="date-format" name="date_format" class="form-control" required>
+    <option value="">-- Select Date Format --</option>
+    <option value="DD/MM/YYYY">DD/MM/YYYY (e.g., 31/12/2023)</option>
+    <option value="MM/DD/YYYY">MM/DD/YYYY (e.g., 12/31/2023)</option>
+    <option value="YYYY-MM-DD">YYYY-MM-DD (e.g., 2023-12-31)</option>
+    <option value="DD-MM-YYYY">DD-MM-YYYY (e.g., 31-12-2023)</option>
+    <option value="MM-DD-YYYY">MM-DD-YYYY (e.g., 12-31-2023)</option>
+  </select>
+</div>
+
+<div class="form-actions">
+  <button type="button" class="btn btn-secondary" onclick="goToStep(1)">Back</button>
+  <button type="submit" class="btn">Preview Data</button>
+</div>
 </form>
 </div>
 </div>
@@ -115,96 +115,100 @@
 <div class="card-body">
 {% if preview_data %}
 <div class="preview-info">
-  <p>Please review the data below to ensure it has been processed correctly.</p>
-  <div class="preview-summary">
-    <div class="summary-item">
-      <div class="summary-label">Total Records:</div>
-      <div class="summary-value">{{ total_rows }}</div>
-    </div>
-    <div class="summary-item">
-      <div class="summary-label">Showing:</div>
-      <div class="summary-value">{{ preview_data|length }} records</div>
-    </div>
+<p>Please review the data below to ensure it has been processed correctly.</p>
+<div class="preview-summary">
+  <div class="summary-item">
+    <div class="summary-label">Total Records:</div>
+    <div class="summary-value">{{ total_rows }}</div>
   </div>
-  
-  {% if date_warnings %}
-  <div class="warning-message">
-    <strong>Warning:</strong> Some dates may not match the selected format. Please check the preview carefully.
+  <div class="summary-item">
+    <div class="summary-label">Showing:</div>
+    <div class="summary-value">{{ preview_data|length }} records</div>
   </div>
+</div>
+
+{% if date_warnings %}
+<div class="warning-message">
+  <strong>Warning:</strong> Some dates may not match the selected format. Please check the preview carefully.
+</div>
+{% endif %}
+
+{% if missing_customers or missing_products %}
+<div class="warning-message">
+  {% if missing_customers %}
+  <div><strong>Note:</strong> All customers will be automatically created during import.</div>
+  <div>Missing Customers: {{ missing_customers|join(', ') }}</div>
   {% endif %}
   
-  {% if missing_products or missing_customers %}
-  <div class="warning-message">
-    <strong>Warning:</strong> Some products or customers in the import file do not exist in the system.
-    {% if missing_products %}
+  {% if missing_products %}
+  <div>
+    <strong>Warning:</strong> Some products in the import file do not exist in the system.
     <div>Missing Products: {{ missing_products|join(', ') }}</div>
-    {% endif %}
-    {% if missing_customers %}
-    <div>Missing Customers: {{ missing_customers|join(', ') }}</div>
-    {% endif %}
   </div>
   {% endif %}
+</div>
+{% endif %}
 </div>
 
 <div class="table-container">
-  <table class="preview-table">
-    <thead>
-      <tr>
-        <th>Invoice Number</th>
-        <th>Date</th>
-        <th>Customer</th>
-        <th>Product</th>
-        <th>Quantity</th>
-        <th>Unit Price</th>
-        <th>GST Amount</th>
-        <th>Total Amount</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in preview_data %}
-      <tr>
-        <td>{{ row.invoice_number }}</td>
-        <td>{{ row.date }}</td>
-        <td>{{ row.customer_name }}</td>
-        <td>{{ row.product_name }}</td>
-        <td>{{ row.quantity }}</td>
-        <td>₹{{ row.unit_price }}</td>
-        <td>₹{{ row.gst_amount }}</td>
-        <td>₹{{ row.total_amount }}</td>
-      </tr>
-      {% endfor %}
-      {% if total_rows > preview_data|length %}
-      <tr>
-        <td colspan="8" class="more-rows">... and {{ total_rows - preview_data|length }} more rows</td>
-      </tr>
-      {% endif %}
-    </tbody>
-  </table>
+<table class="preview-table">
+  <thead>
+    <tr>
+      <th>Invoice Number</th>
+      <th>Date</th>
+      <th>Customer</th>
+      <th>Product Name</th>
+      <th>Quantity</th>
+      <th>Unit Price</th>
+      <th>GST Amount</th>
+      <th>Total Amount</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in preview_data %}
+    <tr>
+      <td>{{ row.invoice_number }}</td>
+      <td>{{ row.date }}</td>
+      <td>{{ row.customer_name }}</td>
+      <td>{{ row.product_name }}</td>
+      <td>{{ row.quantity }}</td>
+      <td>₹{{ row.unit_price }}</td>
+      <td>₹{{ row.gst_amount }}</td>
+      <td>₹{{ row.total_amount }}</td>
+    </tr>
+    {% endfor %}
+    {% if total_rows > preview_data|length %}
+    <tr>
+      <td colspan="8" class="more-rows">... and {{ total_rows - preview_data|length }} more rows</td>
+    </tr>
+    {% endif %}
+  </tbody>
+</table>
 </div>
 
 <form id="import-form" action="{{ url_for('import_bp.process_sales_import') }}" method="post">
-  <input type="hidden" name="file_path" value="{{ file_path }}">
-  <input type="hidden" name="date_format" value="{{ date_format }}">
-  
-  {% if missing_products or missing_customers %}
-  <div class="form-group">
-    <label for="create-missing">
-      <input type="checkbox" id="create-missing" name="create_missing" value="yes" checked>
-      Automatically create missing products and customers
-    </label>
-    <div class="help-text">If checked, missing products and customers will be created with placeholder data that you can update later.</div>
-  </div>
-  {% endif %}
-  
-  <div class="form-actions">
-    <button type="button" class="btn btn-secondary" onclick="goToStep(2)">Back</button>
-    <button type="submit" class="btn">Import Data</button>
-  </div>
+<input type="hidden" name="file_path" value="{{ file_path }}">
+<input type="hidden" name="date_format" value="{{ date_format }}">
+
+{% if missing_products or missing_customers %}
+<div class="form-group">
+  <label for="create-missing">
+    <input type="checkbox" id="create-missing" name="create_missing" value="yes" checked>
+    Automatically create missing customers and products
+  </label>
+  <div class="help-text">If checked, missing customers and products will be created with placeholder data that you can update later.</div>
+</div>
+{% endif %}
+
+<div class="form-actions">
+  <button type="button" class="btn btn-secondary" onclick="goToStep(2)">Back</button>
+  <button type="submit" class="btn">Import Data</button>
+</div>
 </form>
 {% else %}
 <p>No preview data available. Please upload a file first.</p>
 <div class="form-actions">
-  <button type="button" class="btn btn-secondary" onclick="goToStep(1)">Back to Upload</button>
+<button type="button" class="btn btn-secondary" onclick="goToStep(1)">Back to Upload</button>
 </div>
 {% endif %}
 </div>
@@ -218,95 +222,85 @@
 <div class="card-body">
 {% if import_results %}
 <div class="import-summary">
-  <div class="summary-item success">
-    <div class="summary-icon">✓</div>
-    <div class="summary-details">
-      <div class="summary-title">Successfully Imported</div>
-      <div class="summary-value">{{ import_results.success }}</div>
-    </div>
+<div class="summary-item success">
+  <div class="summary-icon">✓</div>
+  <div class="summary-details">
+    <div class="summary-title">Successfully Imported</div>
+    <div class="summary-value">{{ import_results.success }}</div>
   </div>
-  
-  <div class="summary-item warning">
-    <div class="summary-icon">⚠</div>
-    <div class="summary-details">
-      <div class="summary-title">Warnings</div>
-      <div class="summary-value">{{ import_results.warnings }}</div>
-    </div>
+</div>
+
+<div class="summary-item warning">
+  <div class="summary-icon">⚠</div>
+  <div class="summary-details">
+    <div class="summary-title">Warnings</div>
+    <div class="summary-value">{{ import_results.warnings }}</div>
   </div>
-  
-  <div class="summary-item error">
-    <div class="summary-icon">✗</div>
-    <div class="summary-details">
-      <div class="summary-title">Errors</div>
-      <div class="summary-value">{{ import_results.errors }}</div>
-    </div>
+</div>
+
+<div class="summary-item error">
+  <div class="summary-icon">✗</div>
+  <div class="summary-details">
+    <div class="summary-title">Errors</div>
+    <div class="summary-value">{{ import_results.errors }}</div>
   </div>
+</div>
 </div>
 
 <div class="import-details">
-  {% if import_results.new_customers %}
-  <div class="detail-section">
-    <h4>New Customers</h4>
-    <div class="new-entities">
-      <p>The following customers were automatically created:</p>
-      <ul>
-        {% for customer in import_results.new_customers %}
-        <li>{{ customer }}</li>
-        {% endfor %}
-      </ul>
-      <div class="help-text">These customers were created with placeholder data. Please update their details in the Customers section.</div>
-    </div>
-  </div>
-  {% endif %}
-  
-  {% if import_results.new_products %}
-  <div class="detail-section">
-    <h4>New Products</h4>
-    <div class="new-entities">
-      <p>The following products were automatically created:</p>
-      <ul>
-        {% for product in import_results.new_products %}
-        <li>{{ product }}</li>
-        {% endfor %}
-      </ul>
-      <div class="help-text">These products were created with placeholder data. Please update their details in the Stock section.</div>
-    </div>
-  </div>
-  {% endif %}
-  
-  {% if import_results.errors_list %}
-  <div class="detail-section errors-list">
-    <h4>Error Details</h4>
+{% if import_results.new_customers %}
+<div class="detail-section">
+  <h4>New Customers</h4>
+  <div class="new-entities">
+    <p>The following customers were automatically created:</p>
     <ul>
-      {% for error in import_results.errors_list %}
-      <li>{{ error }}</li>
+      {% for customer in import_results.new_customers %}
+      <li>{{ customer }}</li>
       {% endfor %}
     </ul>
+    <div class="help-text">These customers were created with placeholder data. Please update their details in the Customers section.</div>
   </div>
-  {% endif %}
+</div>
+{% endif %}
+
+{% if import_results.new_products %}
+<div class="detail-section">
+  <h4>New Products</h4>
+  <div class="new-entities">
+    <p>The following products were automatically created:</p>
+    <ul>
+      {% for product in import_results.new_products %}
+      <li>{{ product }}</li>
+      {% endfor %}
+    </ul>
+    <div class="help-text">These products were created with placeholder data. Please update their details in the Stock section.</div>
+  </div>
+</div>
+{% endif %}
+
+{% if import_results.errors_list %}
+<div class="detail-section errors-list">
+  <h4>Error Details</h4>
+  <ul>
+    {% for error in import_results.errors_list %}
+    <li>{{ error }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
 </div>
 
 <div class="form-actions">
-  <a href="{{ url_for('sales') }}" class="btn btn-secondary">View Sales</a>
-  <a href="{{ url_for('import_bp.import_data') }}" class="btn">Import More Data</a>
+<a href="{{ url_for('sales') }}" class="btn btn-secondary">View Sales</a>
+<a href="{{ url_for('import_bp.import_data') }}" class="btn">Import More Data</a>
 </div>
 {% else %}
 <p>No import results available. Please complete the import process first.</p>
 <div class="form-actions">
-  <a href="{{ url_for('import_bp.import_data') }}" class="btn">Back to Import</a>
+<a href="{{ url_for('import_bp.import_data') }}" class="btn">Back to Import</a>
 </div>
 {% endif %}
 </div>
-</div>
-
-<div class="loading-container" id="loading-overlay">
-  <div class="dot-wave">
-    <span class="dot"></span>
-    <span class="dot"></span>
-    <span class="dot"></span>
-    <span class="dot"></span>
-  </div>
-  <div class="loading-text">Processing...</div>
 </div>
 {% endblock %}
 
@@ -448,8 +442,8 @@ color: var(--text-color);
 
 .note {
 font-style: italic;
-color: var(--accent-color);
 margin-top: 1rem;
+color: var(--accent-color);
 }
 
 /* Preview Styles */
@@ -636,95 +630,95 @@ color: #dc3545;
 /* Responsive Styles */
 @media (max-width: 768px) {
 .import-workflow {
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 0;
+flex-direction: column;
+align-items: flex-start;
+padding: 0;
 }
 
 .workflow-step {
-  flex-direction: row;
-  width: 100%;
-  margin-bottom: 1rem;
+flex-direction: row;
+width: 100%;
+margin-bottom: 1rem;
 }
 
 .step-number {
-  margin-bottom: 0;
-  margin-right: 1rem;
+margin-bottom: 0;
+margin-right: 1rem;
 }
 
 .workflow-connector {
-  display: none;
+display: none;
 }
 
 .import-summary {
-  flex-direction: column;
+flex-direction: column;
 }
 
 .import-summary .summary-item {
-  margin: 0 0 1rem 0;
+margin: 0 0 1rem 0;
 }
 }
 
 /* Loading Animation Styles */
 .loading-container {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.7);
-  z-index: 9999;
-  justify-content: center;
-  align-items: center;
-  flex-direction: column;
+display: none;
+position: fixed;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background-color: rgba(0, 0, 0, 0.7);
+z-index: 9999;
+justify-content: center;
+align-items: center;
+flex-direction: column;
 }
 
 .loading-container.active {
-  display: flex;
+display: flex;
 }
 
 .loading-text {
-  color: var(--secondary-color);
-  margin-top: 20px;
-  font-size: 1.2rem;
+color: var(--secondary-color);
+margin-top: 20px;
+font-size: 1.2rem;
 }
 
 .dot-wave {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+display: flex;
+justify-content: center;
+align-items: center;
 }
 
 .dot-wave .dot {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  margin: 0 5px;
-  background-color: var(--accent-color);
-  animation: dot-wave 1.5s infinite ease-in-out;
+display: inline-block;
+width: 12px;
+height: 12px;
+border-radius: 50%;
+margin: 0 5px;
+background-color: var(--accent-color);
+animation: dot-wave 1.5s infinite ease-in-out;
 }
 
 .dot-wave .dot:nth-child(2) {
-  animation-delay: 0.2s;
+animation-delay: 0.2s;
 }
 
 .dot-wave .dot:nth-child(3) {
-  animation-delay: 0.4s;
+animation-delay: 0.4s;
 }
 
 .dot-wave .dot:nth-child(4) {
-  animation-delay: 0.6s;
+animation-delay: 0.6s;
 }
 
 @keyframes dot-wave {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-15px);
-  }
+0%, 100% {
+  transform: translateY(0);
+}
+50% {
+  transform: translateY(-15px);
+}
 }
 </style>
 {% endblock %}
@@ -738,10 +732,33 @@ const fileInput = document.getElementById('file-input');
 const filePrompt = document.querySelector('.file-prompt');
 const fileName = document.querySelector('.file-name');
 const uploadBtn = document.getElementById('upload-btn');
+const loadingOverlay = document.getElementById('loading-overlay');
+
+// Setup form submission handlers for loading animation
 const uploadForm = document.getElementById('upload-form');
 const dateFormatForm = document.getElementById('date-format-form');
 const importForm = document.getElementById('import-form');
-const loadingOverlay = document.getElementById('loading-overlay');
+
+if (uploadForm) {
+  uploadForm.addEventListener('submit', function() {
+    console.log('Upload form submitted, showing loading overlay');
+    loadingOverlay.classList.add('active');
+  });
+}
+
+if (dateFormatForm) {
+  dateFormatForm.addEventListener('submit', function() {
+    console.log('Date format form submitted, showing loading overlay');
+    loadingOverlay.classList.add('active');
+  });
+}
+
+if (importForm) {
+  importForm.addEventListener('submit', function() {
+    console.log('Import form submitted, showing loading overlay');
+    loadingOverlay.classList.add('active');
+  });
+}
 
 if (dropArea) {
   // Prevent default drag behaviors
@@ -753,6 +770,10 @@ if (dropArea) {
   // Highlight drop area when item is dragged over it
   ['dragenter', 'dragover'].forEach(eventName => {
     dropArea.addEventListener(eventName, highlight, false);
+  });
+  
+  ['dragleave', 'drop'].forEach(eventName => {
+    dropArea.addEventListener(eventName, unhighlight, false);
   });
   
   // Handle dropped files
@@ -769,6 +790,10 @@ function preventDefaults(e) {
 
 function highlight() {
   dropArea.classList.add('dragover');
+}
+
+function unhighlight() {
+  dropArea.classList.remove('dragover');
 }
 
 function handleDrop(e) {
@@ -808,55 +833,6 @@ function validateFileType(file) {
     fileName.style.display = 'none';
     uploadBtn.disabled = true;
   }
-}
-
-// Show loading overlay when forms are submitted
-document.addEventListener('DOMContentLoaded', function() {
-  const uploadForm = document.getElementById('upload-form');
-  const dateFormatForm = document.getElementById('date-format-form');
-  const importForm = document.getElementById('import-form');
-  const loadingOverlay = document.getElementById('loading-overlay');
-
-  if (uploadForm) {
-    uploadForm.addEventListener('submit', function() {
-      loadingOverlay.classList.add('active');
-    });
-  }
-
-  if (dateFormatForm) {
-    dateFormatForm.addEventListener('submit', function() {
-      loadingOverlay.classList.add('active');
-    });
-  }
-
-  if (importForm) {
-    importForm.addEventListener('submit', function() {
-      loadingOverlay.classList.add('active');
-    });
-  }
-});
-
-// Form submission handling with loading overlay
-if (uploadForm) {
-  uploadForm.addEventListener('submit', function() {
-    showLoadingOverlay();
-  });
-}
-
-if (dateFormatForm) {
-  dateFormatForm.addEventListener('submit', function() {
-    showLoadingOverlay();
-  });
-}
-
-if (importForm) {
-  importForm.addEventListener('submit', function() {
-    showLoadingOverlay();
-  });
-}
-
-function showLoadingOverlay() {
-  loadingOverlay.classList.add('active');
 }
 });
 
