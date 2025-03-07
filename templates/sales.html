@@ -1115,10 +1115,17 @@
             fetch('/api/sales')
                 .then(response => {
                     console.log('Sales API response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                    }
                     return response.json();
                 })
                 .then(sales => {
                     console.log('Sales data loaded:', sales.length, 'records');
+                    if (!Array.isArray(sales)) {
+                        console.error('Expected array but got:', typeof sales);
+                        throw new Error('Invalid data format received from server');
+                    }
                     renderSales(sales);
                     
                     // Hide loading indicator
@@ -1127,8 +1134,8 @@
                 })
                 .catch(error => {
                     console.error('Error loading sales:', error);
-                    salesList.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 1rem;">Error loading sales data. Please try refreshing the page.</td></tr>`;
-                    alert('An error occurred while loading sales');
+                    salesList.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 1rem;">Error loading sales data: ${error.message}. Please try refreshing the page.</td></tr>`;
+                    alert('An error occurred while loading sales: ' + error.message);
                     
                     // Hide loading indicator even on error
                     document.getElementById('loading-indicator').style.display = 'none';
@@ -1138,7 +1145,17 @@
 
         // Add renderSales function
         function renderSales(sales) {
+            if (!salesList) {
+                console.error('Sales list element not found');
+                return;
+            }
+            
             salesList.innerHTML = '';
+            
+            if (sales.length === 0) {
+                salesList.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 1rem;">No sales records found.</td></tr>';
+                return;
+            }
             
             let todayTotal = 0;
             let weekTotal = 0;
@@ -1153,62 +1170,75 @@
             const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
             
             sales.forEach(sale => {
-                const row = document.createElement('tr');
-                
-                const saleDate = new Date(sale.sale_date);
-                
-                // Calculate summary totals
-                if (saleDate >= today) {
-                    todayTotal += sale.total_amount;
-                }
-                
-                if (saleDate >= weekStart) {
-                    weekTotal += sale.total_amount;
-                }
-                
-                if (saleDate >= monthStart) {
-                    monthTotal += sale.total_amount;
-                }
-                
-                // Format products list
-                const productsList = sale.items.map(item => item.product_name).join(', ');
-        
-        row.innerHTML = `
-            <td>${sale.customer_name}</td>
-            <td>${sale.customer_gst_id}</td>
-            <td>${new Date(sale.sale_date).toLocaleDateString()}</td>
-            <td>${productsList}</td>
-            <td>₹${sale.total_amount.toFixed(2)}</td>
-            <td>
-                <button class="btn btn-secondary view-sale" data-id="${sale.id}" data-sale="${encodeURIComponent(JSON.stringify(sale))}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem; margin-right: 0.5rem;">View Details</button>
-                <button class="btn btn-danger delete-sale" data-id="${sale.id}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem;">Delete</button>
-            </td>
-        `;
-        
-        salesList.appendChild(row);
-    });
+                try {
+                    const row = document.createElement('tr');
+                    
+                    const saleDate = new Date(sale.sale_date);
+                    
+                    // Calculate summary totals
+                    if (!isNaN(saleDate.getTime())) {
+                        if (saleDate >= today) {
+                            todayTotal += sale.total_amount;
+                        }
+                        
+                        if (saleDate >= weekStart) {
+                            weekTotal += sale.total_amount;
+                        }
+                        
+                        if (saleDate >= monthStart) {
+                            monthTotal += sale.total_amount;
+                        }
+                    }
+                    
+                    // Format products list safely
+                    const productsList = sale.items && Array.isArray(sale.items) 
+                        ? sale.items.map(item => item.product_name || 'Unknown').join(', ')
+                        : 'No products';
     
-    // Update summary cards
-    todaySales.textContent = `₹${todayTotal.toFixed(2)}`;
-    weekSales.textContent = `₹${weekTotal.toFixed(2)}`;
-    monthSales.textContent = `₹${monthTotal.toFixed(2)}`;
-    
-    // Add event listeners to view and delete buttons
-    document.querySelectorAll('.view-sale').forEach(button => {
-        button.addEventListener('click', function() {
-            const saleData = JSON.parse(decodeURIComponent(this.getAttribute('data-sale')));
-            showSaleDetails(saleData);
-        });
-    });
-    
-    document.querySelectorAll('.delete-sale').forEach(button => {
-        button.addEventListener('click', function() {
-            const saleId = this.getAttribute('data-id');
-            document.getElementById('delete-sale-id').value = saleId;
-            deleteSaleModal.style.display = 'block';
-        });
-    });
-}
+                    row.innerHTML = `
+                        <td>${sale.customer_name || 'Unknown'}</td>
+                        <td>${sale.customer_gst_id || 'N/A'}</td>
+                        <td>${!isNaN(saleDate.getTime()) ? saleDate.toLocaleDateString() : 'Invalid date'}</td>
+                        <td>${productsList}</td>
+                        <td>₹${typeof sale.total_amount === 'number' ? sale.total_amount.toFixed(2) : '0.00'}</td>
+                        <td>
+                            <button class="btn btn-secondary view-sale" data-id="${sale.id}" data-sale="${encodeURIComponent(JSON.stringify(sale))}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem; margin-right: 0.5rem;">View Details</button>
+                            <button class="btn btn-danger delete-sale" data-id="${sale.id}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem;">Delete</button>
+                        </td>
+                    `;
+                    
+                    salesList.appendChild(row);
+                } catch (error) {
+                    console.error('Error rendering sale row:', error, sale);
+                }
+            });
+            
+            // Update summary cards
+            if (todaySales) todaySales.textContent = `₹${todayTotal.toFixed(2)}`;
+            if (weekSales) weekSales.textContent = `₹${weekTotal.toFixed(2)}`;
+            if (monthSales) monthSales.textContent = `₹${monthTotal.toFixed(2)}`;
+            
+            // Add event listeners to view and delete buttons
+            document.querySelectorAll('.view-sale').forEach(button => {
+                button.addEventListener('click', function() {
+                    try {
+                        const saleData = JSON.parse(decodeURIComponent(this.getAttribute('data-sale')));
+                        showSaleDetails(saleData);
+                    } catch (error) {
+                        console.error('Error parsing sale data:', error);
+                        alert('Error viewing sale details. Please try again.');
+                    }
+                });
+            });
+            
+            document.querySelectorAll('.delete-sale').forEach(button => {
+                button.addEventListener('click', function() {
+                    const saleId = this.getAttribute('data-id');
+                    document.getElementById('delete-sale-id').value = saleId;
+                    deleteSaleModal.style.display = 'block';
+                });
+            });
+        }
 
 // Add delete sale functionality
 document.getElementById('confirm-delete-sale').addEventListener('click', function() {

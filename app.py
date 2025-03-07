@@ -736,44 +736,68 @@ def add_sale():
 @app.route('/api/sales', methods=['GET'])
 @login_required
 def get_sales():
-    try:
-        sales = Sale.query.filter_by(user_id=current_user.id).all()
-        logger.info(f"Fetched {len(sales)} sales records from database")
-        result = []
+  try:
+      sales = Sale.query.filter_by(user_id=current_user.id).all()
+      logger.info(f"Fetched {len(sales)} sales records from database")
+      result = []
 
-        for sale in sales:
-            # Format date in IST
-            sale_date_ist = sale.sale_date.astimezone(IST) if sale.sale_date.tzinfo else IST.localize(sale.sale_date)
-          
-            sale_data = {
-                'id': sale.id,
-                'customer_name': sale.customer.name,
-                'customer_gst_id': sale.customer.gst_id,
-                'sale_date': sale_date_ist.strftime('%Y-%m-%d %H:%M:%S'),
-                'delivery_charges': sale.delivery_charges,
-                'total_amount': sale.total_amount,
-                'items': []
-            }
-          
-            for item in sale.items:
-                item_data = {
-                    'product_name': item.product.name,
-                    'product_id': item.product.product_id,
-                    'quantity': item.quantity,
-                    'gst_percentage': item.gst_percentage,
-                    'discount_percentage': item.discount_percentage,
-                    'unit_price': item.unit_price,
-                    'total_price': item.total_price
-                }
-                sale_data['items'].append(item_data)
-          
-            result.append(sale_data)
+      for sale in sales:
+          try:
+              # Format date in IST - handle timezone-aware and naive datetime objects
+              if sale.sale_date:
+                  if sale.sale_date.tzinfo:
+                      sale_date_ist = sale.sale_date.astimezone(IST)
+                  else:
+                      sale_date_ist = IST.localize(sale.sale_date)
+                  date_str = sale_date_ist.strftime('%Y-%m-%d %H:%M:%S')
+              else:
+                  date_str = "N/A"
+              
+              # Get customer details safely
+              customer_name = sale.customer.name if sale.customer else "Unknown"
+              customer_gst_id = sale.customer.gst_id if sale.customer else "Unknown"
+              
+              sale_data = {
+                  'id': sale.id,
+                  'customer_name': customer_name,
+                  'customer_gst_id': customer_gst_id,
+                  'sale_date': date_str,
+                  'delivery_charges': float(sale.delivery_charges) if sale.delivery_charges else 0.0,
+                  'total_amount': float(sale.total_amount) if sale.total_amount else 0.0,
+                  'items': []
+              }
+              
+              # Process each item with error handling
+              for item in sale.items:
+                  try:
+                      if not item.product:
+                          logger.warning(f"Sale item {item.id} has no associated product")
+                          continue
+                          
+                      item_data = {
+                          'product_name': item.product.name,
+                          'product_id': item.product.product_id,
+                          'quantity': item.quantity,
+                          'gst_percentage': float(item.gst_percentage) if item.gst_percentage else 0.0,
+                          'discount_percentage': float(item.discount_percentage) if item.discount_percentage else 0.0,
+                          'unit_price': float(item.unit_price) if item.unit_price else 0.0,
+                          'total_price': float(item.total_price) if item.total_price else 0.0
+                      }
+                      sale_data['items'].append(item_data)
+                  except Exception as item_error:
+                      logger.error(f"Error processing sale item {item.id}: {str(item_error)}")
+                      continue
+              
+              result.append(sale_data)
+          except Exception as sale_error:
+              logger.error(f"Error processing sale {sale.id}: {str(sale_error)}")
+              continue
 
-        logger.info(f"Returning {len(result)} formatted sales records")
-        return jsonify(result)
-    except Exception as e:
-        logger.error(f"Error in get_sales: {str(e)}")
-        return jsonify({'error': 'Failed to fetch sales'}), 500
+      logger.info(f"Returning {len(result)} formatted sales records")
+      return jsonify(result)
+  except Exception as e:
+      logger.error(f"Error in get_sales: {str(e)}")
+      return jsonify({'error': 'Failed to fetch sales'}), 500
 
 @app.route('/api/sales/<int:id>', methods=['DELETE'])
 @login_required
@@ -863,43 +887,69 @@ def add_purchase():
 @app.route('/api/purchases', methods=['GET'])
 @login_required
 def get_purchases():
-    try:
-        purchases = Purchase.query.filter_by(user_id=current_user.id).all()
-        result = []
+  try:
+      purchases = Purchase.query.filter_by(user_id=current_user.id).all()
+      logger.info(f"Fetched {len(purchases)} purchase records from database")
+      result = []
 
-        for purchase in purchases:
-            # Format date in IST
-            purchase_date_ist = purchase.purchase_date.astimezone(IST) if purchase.purchase_date.tzinfo else IST.localize(purchase.purchase_date)
-          
-            purchase_data = {
-                'id': purchase.id,
-                'vendor_name': purchase.vendor.name,
-                'vendor_gst_id': purchase.vendor.gst_id,
-                'order_id': purchase.order_id,
-                'purchase_date': purchase_date_ist.strftime('%Y-%m-%d'),
-                'delivery_charges': purchase.delivery_charges,
-                'total_amount': purchase.total_amount,
-                'status': purchase.status,
-                'items': []
-            }
-          
-            for item in purchase.items:
-                item_data = {
-                    'product_name': item.product.name,
-                    'product_id': item.product.product_id,
-                    'quantity': item.quantity,
-                    'gst_percentage': item.gst_percentage,
-                    'unit_price': item.unit_price,
-                    'total_price': item.total_price
-                }
-                purchase_data['items'].append(item_data)
-          
-            result.append(purchase_data)
+      for purchase in purchases:
+          try:
+              # Format date in IST - handle timezone-aware and naive datetime objects
+              if purchase.purchase_date:
+                  if purchase.purchase_date.tzinfo:
+                      purchase_date_ist = purchase.purchase_date.astimezone(IST)
+                  else:
+                      purchase_date_ist = IST.localize(purchase.purchase_date)
+                  date_str = purchase_date_ist.strftime('%Y-%m-%d')
+              else:
+                  date_str = "N/A"
+              
+              # Get vendor details safely
+              vendor_name = purchase.vendor.name if purchase.vendor else "Unknown"
+              vendor_gst_id = purchase.vendor.gst_id if purchase.vendor else "Unknown"
+              
+              purchase_data = {
+                  'id': purchase.id,
+                  'vendor_name': vendor_name,
+                  'vendor_gst_id': vendor_gst_id,
+                  'order_id': purchase.order_id or "N/A",
+                  'purchase_date': date_str,
+                  'delivery_charges': float(purchase.delivery_charges) if purchase.delivery_charges else 0.0,
+                  'total_amount': float(purchase.total_amount) if purchase.total_amount else 0.0,
+                  'status': purchase.status or "Unknown",
+                  'items': []
+              }
+              
+              # Process each item with error handling
+              for item in purchase.items:
+                  try:
+                      if not item.product:
+                          logger.warning(f"Purchase item {item.id} has no associated product")
+                          continue
+                          
+                      item_data = {
+                          'product_name': item.product.name,
+                          'product_id': item.product.product_id,
+                          'quantity': item.quantity,
+                          'gst_percentage': float(item.gst_percentage) if item.gst_percentage else 0.0,
+                          'unit_price': float(item.unit_price) if item.unit_price else 0.0,
+                          'total_price': float(item.total_price) if item.total_price else 0.0
+                      }
+                      purchase_data['items'].append(item_data)
+                  except Exception as item_error:
+                      logger.error(f"Error processing purchase item {item.id}: {str(item_error)}")
+                      continue
+              
+              result.append(purchase_data)
+          except Exception as purchase_error:
+              logger.error(f"Error processing purchase {purchase.id}: {str(purchase_error)}")
+              continue
 
-        return jsonify(result)
-    except Exception as e:
-        logger.error(f"Error in get_purchases: {str(e)}")
-        return jsonify({'error': 'Failed to fetch purchases'}), 500
+      logger.info(f"Returning {len(result)} formatted purchase records")
+      return jsonify(result)
+  except Exception as e:
+      logger.error(f"Error in get_purchases: {str(e)}")
+      return jsonify({'error': 'Failed to fetch purchases'}), 500
 
 @app.route('/api/purchases/<int:id>', methods=['PUT'])
 @login_required

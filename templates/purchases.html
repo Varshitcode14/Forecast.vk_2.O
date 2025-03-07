@@ -575,6 +575,79 @@
         transform: translateY(-15px);
     }
 }
+
+/* Detail view styles */
+.sale-detail-section {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.sale-detail-section h4 {
+    color: var(--secondary-color);
+    margin-top: 0;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.detail-row {
+    display: flex;
+    margin-bottom: 0.5rem;
+}
+
+.detail-label {
+    font-weight: 500;
+    width: 150px;
+    color: var(--secondary-color);
+}
+
+.detail-value {
+    flex: 1;
+}
+
+/* Table styles for purchase details */
+.sale-detail-section table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.sale-detail-section th {
+    text-align: left;
+    padding: 0.75rem;
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--secondary-color);
+    font-weight: 500;
+}
+
+.sale-detail-section td {
+    padding: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sale-detail-section tr:hover td {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* Error message styles */
+.error-message {
+    background-color: rgba(244, 67, 54, 0.1);
+    border: 1px solid rgba(244, 67, 54, 0.3);
+    color: #f44336;
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.no-data-message {
+    text-align: center;
+    padding: 2rem;
+    color: var(--secondary-color);
+    font-style: italic;
+}
 </style>
 {% endblock %}
 
@@ -685,7 +758,12 @@
               },
               body: JSON.stringify(vendorData)
           })
-          .then(response => response.json())
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+              }
+              return response.json();
+          })
           .then(data => {
               if (data.success) {
                   addVendorModal.style.display = 'none';
@@ -696,7 +774,7 @@
           })
           .catch(error => {
               console.error('Error:', error);
-              alert('An error occurred while adding the vendor');
+              alert('An error occurred while adding the vendor: ' + error.message);
           });
       });
 
@@ -721,7 +799,12 @@
               },
               body: JSON.stringify(vendorData)
           })
-          .then(response => response.json())
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+              }
+              return response.json();
+          })
           .then(data => {
               if (data.success) {
                   editVendorModal.style.display = 'none';
@@ -732,7 +815,7 @@
           })
           .catch(error => {
               console.error('Error:', error);
-              alert('An error occurred while updating the vendor');
+              alert('An error occurred while updating the vendor: ' + error.message);
           });
       });
 
@@ -743,7 +826,12 @@
           fetch(`/api/vendors/${vendorId}`, {
               method: 'DELETE'
           })
-          .then(response => response.json())
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+              }
+              return response.json();
+          })
           .then(data => {
               if (data.success) {
                   deleteVendorModal.style.display = 'none';
@@ -754,7 +842,7 @@
           })
           .catch(error => {
               console.error('Error:', error);
-              alert('An error occurred while deleting the vendor');
+              alert('An error occurred while deleting the vendor: ' + error.message);
           });
       });
 
@@ -793,8 +881,8 @@
               order_id: document.getElementById('purchase-order-id').value,
               purchase_date: document.getElementById('purchase-date').value,
               status: document.getElementById('purchase-status').value,
-              delivery_charges: parseFloat(purchaseDeliveryCharges.value),
-              total_amount: parseFloat(purchaseTotalAmount.value),
+              delivery_charges: parseFloat(purchaseDeliveryCharges.value) || 0,
+              total_amount: parseFloat(purchaseTotalAmount.value) || 0,
               items: []
           };
           
@@ -807,10 +895,10 @@
               const productId = document.getElementById(`purchase-product-${index}`).value;
               if (!productId) continue;
               
-              const quantity = parseInt(document.getElementById(`purchase-quantity-${index}`).value);
-              const unitPrice = parseFloat(document.getElementById(`purchase-unit-price-${index}`).value);
-              const gstPercentage = parseFloat(document.getElementById(`purchase-gst-${index}`).value);
-              const totalPrice = parseFloat(document.getElementById(`purchase-total-price-${index}`).value);
+              const quantity = parseInt(document.getElementById(`purchase-quantity-${index}`).value) || 0;
+              const unitPrice = parseFloat(document.getElementById(`purchase-unit-price-${index}`).value) || 0;
+              const gstPercentage = parseFloat(document.getElementById(`purchase-gst-${index}`).value) || 0;
+              const totalPrice = parseFloat(document.getElementById(`purchase-total-price-${index}`).value) || 0;
               
               purchaseData.items.push({
                   product_id: parseInt(productId),
@@ -833,7 +921,12 @@
               },
               body: JSON.stringify(purchaseData)
           })
-          .then(response => response.json())
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+              }
+              return response.json();
+          })
           .then(data => {
               if (data.success) {
                   addPurchaseModal.style.display = 'none';
@@ -844,7 +937,7 @@
           })
           .catch(error => {
               console.error('Error:', error);
-              alert('An error occurred while adding the purchase');
+              alert('An error occurred while adding the purchase: ' + error.message);
           });
       });
 
@@ -862,7 +955,12 @@
               },
               body: JSON.stringify({ status: status })
           })
-          .then(response => response.json())
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+              }
+              return response.json();
+          })
           .then(data => {
               if (data.success) {
                   updateStatusModal.style.display = 'none';
@@ -873,40 +971,50 @@
           })
           .catch(error => {
               console.error('Error:', error);
-              alert('An error occurred while updating the purchase status');
+              alert('An error occurred while updating the purchase status: ' + error.message);
           });
       });
 
       // Load Vendors
       function loadVendors() {
           fetch('/api/vendors')
-              .then(response => response.json())
+              .then(response => {
+                  if (!response.ok) {
+                      throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                  }
+                  return response.json();
+              })
               .then(data => {
                   vendors = data;
             
-            // Update vendor select
-            purchaseVendorSelect.innerHTML = '<option value="">Select Vendor</option>';
-            
-            data.forEach(vendor => {
-                const option = document.createElement('option');
-                option.value = vendor.id;
-                option.textContent = vendor.name;
-                purchaseVendorSelect.appendChild(option);
-            });
-            
-            // Update total vendors count
-            totalVendors.textContent = data.length;
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred while loading vendors');
-        });
-}
+                  // Update vendor select
+                  purchaseVendorSelect.innerHTML = '<option value="">Select Vendor</option>';
+                  
+                  data.forEach(vendor => {
+                      const option = document.createElement('option');
+                      option.value = vendor.id;
+                      option.textContent = vendor.name;
+                      purchaseVendorSelect.appendChild(option);
+                  });
+                  
+                  // Update total vendors count
+                  totalVendors.textContent = data.length;
+              })
+              .catch(error => {
+                  console.error('Error loading vendors:', error);
+                  alert('An error occurred while loading vendors: ' + error.message);
+              });
+      }
 
       // Load Products
       function loadProducts() {
           fetch('/api/products')
-              .then(response => response.json())
+              .then(response => {
+                  if (!response.ok) {
+                      throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                  }
+                  return response.json();
+              })
               .then(data => {
                   products = data;
                   
@@ -914,8 +1022,8 @@
                   updateProductSelects();
               })
               .catch(error => {
-                  console.error('Error:', error);
-                  alert('An error occurred while loading products');
+                  console.error('Error loading products:', error);
+                  alert('An error occurred while loading products: ' + error.message);
               });
       }
 
@@ -1093,8 +1201,19 @@
           document.getElementById('purchases-table').style.display = 'none';
           
           fetch('/api/purchases')
-              .then(response => response.json())
+              .then(response => {
+                  console.log('Purchases API response status:', response.status);
+                  if (!response.ok) {
+                      throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                  }
+                  return response.json();
+              })
               .then(purchases => {
+                  console.log('Purchases data loaded:', purchases.length, 'records');
+                  if (!Array.isArray(purchases)) {
+                      console.error('Expected array but got:', typeof purchases);
+                      throw new Error('Invalid data format received from server');
+                  }
                   renderPurchases(purchases);
                   
                   // Hide loading indicator
@@ -1102,8 +1221,9 @@
                   document.getElementById('purchases-table').style.display = 'table';
               })
               .catch(error => {
-                  console.error('Error:', error);
-                  alert('An error occurred while loading purchases');
+                  console.error('Error loading purchases:', error);
+                  purchasesList.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 1rem;">Error loading purchases data: ${error.message}. Please try refreshing the page.</td></tr>`;
+                  alert('An error occurred while loading purchases: ' + error.message);
                   
                   // Hide loading indicator even on error
                   document.getElementById('loading-indicator').style.display = 'none';
@@ -1113,81 +1233,90 @@
 
       // Show Purchase Details
       function showPurchaseDetails(purchase) {
-          const purchaseDetailsContent = `
-              <div class="sale-detail-section">
-                  <h4>Vendor Information</h4>
-                  <div class="detail-row">
-                      <span class="detail-label">Vendor Name:</span>
-                      <span class="detail-value">${purchase.vendor_name}</span>
+          try {
+              const purchaseDetailsContent = `
+                  <div class="sale-detail-section">
+                      <h4>Vendor Information</h4>
+                      <div class="detail-row">
+                          <span class="detail-label">Vendor Name:</span>
+                          <span class="detail-value">${purchase.vendor_name || 'N/A'}</span>
+                      </div>
+                      <div class="detail-row">
+                          <span class="detail-label">GST ID:</span>
+                          <span class="detail-value">${purchase.vendor_gst_id || 'N/A'}</span>
+                      </div>
                   </div>
-                  <div class="detail-row">
-                      <span class="detail-label">GST ID:</span>
-                      <span class="detail-value">${purchase.vendor_gst_id}</span>
+                  
+                  <div class="sale-detail-section">
+                      <h4>Purchase Information</h4>
+                      <div class="detail-row">
+                          <span class="detail-label">Order ID:</span>
+                          <span class="detail-value">${purchase.order_id || 'N/A'}</span>
+                      </div>
+                      <div class="detail-row">
+                          <span class="detail-label">Purchase Date:</span>
+                          <span class="detail-value">${new Date(purchase.purchase_date).toLocaleDateString()}</span>
+                      </div>
+                      <div class="detail-row">
+                          <span class="detail-label">Status:</span>
+                          <span class="detail-value">${purchase.status || 'N/A'}</span>
+                      </div>
+                      <div class="detail-row">
+                          <span class="detail-label">Delivery Charges:</span>
+                          <span class="detail-value">₹${(purchase.delivery_charges || 0).toFixed(2)}</span>
+                      </div>
+                      <div class="detail-row">
+                          <span class="detail-label">Total Amount:</span>
+                          <span class="detail-value">₹${(purchase.total_amount || 0).toFixed(2)}</span>
+                      </div>
                   </div>
-              </div>
-              
-              <div class="sale-detail-section">
-                  <h4>Purchase Information</h4>
-                  <div class="detail-row">
-                      <span class="detail-label">Order ID:</span>
-                      <span class="detail-value">${purchase.order_id}</span>
-                  </div>
-                  <div class="detail-row">
-                      <span class="detail-label">Purchase Date:</span>
-                      <span class="detail-value">${new Date(purchase.purchase_date).toLocaleDateString()}</span>
-                  </div>
-                  <div class="detail-row">
-                      <span class="detail-label">Status:</span>
-                      <span class="detail-value">${purchase.status}</span>
-                  </div>
-                  <div class="detail-row">
-                      <span class="detail-label">Delivery Charges:</span>
-                      <span class="detail-value">₹${purchase.delivery_charges.toFixed(2)}</span>
-                  </div>
-                  <div class="detail-row">
-                      <span class="detail-label">Total Amount:</span>
-                      <span class="detail-value">₹${purchase.total_amount.toFixed(2)}</span>
-                  </div>
-              </div>
-              
-              <div class="sale-detail-section">
-                  <h4>Products</h4>
-                  <table style="width: 100%;">
-                      <thead>
-                          <tr>
-                              <th>Product ID</th>
-                              <th>Product Name</th>
-                              <th>Quantity</th>
-                              <th>Unit Price</th>
-                              <th>GST %</th>
-                              <th>Total</th>
-                          </tr>
-                      </thead>
-                      <tbody>
-                          ${purchase.items.map(item => `
+                  
+                  <div class="sale-detail-section">
+                      <h4>Products</h4>
+                      ${purchase.items && purchase.items.length > 0 ? `
+                      <table style="width: 100%;">
+                          <thead>
                               <tr>
-                                  <td>${item.product_id}</td>
-                                  <td>${item.product_name}</td>
-                                  <td>${item.quantity}</td>
-                                  <td>₹${item.unit_price.toFixed(2)}</td>
-                                  <td>${item.gst_percentage}%</td>
-                                  <td>₹${item.total_price.toFixed(2)}</td>
+                                  <th>Product ID</th>
+                                  <th>Product Name</th>
+                                  <th>Quantity</th>
+                                  <th>Unit Price</th>
+                                  <th>GST %</th>
+                                  <th>Total</th>
                               </tr>
-                          `).join('')}
-                      </tbody>
-                  </table>
-              </div>
-          `;
-          
-          document.getElementById('purchase-details-content').innerHTML = purchaseDetailsContent;
-          viewPurchaseModal.style.display = 'block';
+                          </thead>
+                          <tbody>
+                              ${purchase.items.map(item => `
+                                  <tr>
+                                      <td>${item.product_id || 'N/A'}</td>
+                                      <td>${item.product_name || 'N/A'}</td>
+                                      <td>${item.quantity || 0}</td>
+                                      <td>₹${(item.unit_price || 0).toFixed(2)}</td>
+                                      <td>${(item.gst_percentage || 0)}%</td>
+                                      <td>₹${(item.total_price || 0).toFixed(2)}</td>
+                                  </tr>
+                              `).join('')}
+                          </tbody>
+                      </table>
+                      ` : '<p class="no-data-message">No product items found for this purchase.</p>'}
+                  </div>
+              `;
+              
+              document.getElementById('purchase-details-content').innerHTML = purchaseDetailsContent;
+              viewPurchaseModal.style.display = 'block';
+          } catch (error) {
+              console.error('Error displaying purchase details:', error);
+              alert('Error displaying purchase details: ' + error.message);
+          }
       }
 
       // Add first purchase item
       addPurchaseItem();
 
       // Delivery charges change
-      purchaseDeliveryCharges.addEventListener('input', calculateOrderTotal);
+      if (purchaseDeliveryCharges) {
+          purchaseDeliveryCharges.addEventListener('input', calculateOrderTotal);
+      }
 
       // Initial load
       loadVendors();
@@ -1218,170 +1347,216 @@
           }
       });
 
-// Add search functionality
-searchBtn.addEventListener('click', function() {
-    const searchTerm = vendorSearch.value.toLowerCase().trim();
-    if (searchTerm) {
-        filterPurchases(searchTerm);
-    }
-});
+      // Add search functionality
+      searchBtn.addEventListener('click', function() {
+          const searchTerm = vendorSearch.value.toLowerCase().trim();
+          if (searchTerm) {
+              filterPurchases(searchTerm);
+          }
+      });
 
-resetSearchBtn.addEventListener('click', function() {
-    vendorSearch.value = '';
-    loadPurchases();
-});
+      resetSearchBtn.addEventListener('click', function() {
+          vendorSearch.value = '';
+          loadPurchases();
+      });
 
-vendorSearch.addEventListener('keyup', function(e) {
-    if (e.key === 'Enter') {
-        const searchTerm = vendorSearch.value.toLowerCase().trim();
-        if (searchTerm) {
-            filterPurchases(searchTerm);
-        }
-    }
-});
+      vendorSearch.addEventListener('keyup', function(e) {
+          if (e.key === 'Enter') {
+              const searchTerm = vendorSearch.value.toLowerCase().trim();
+              if (searchTerm) {
+                  filterPurchases(searchTerm);
+              }
+          }
+      });
 
-function filterPurchases(searchTerm) {
-    // Show loading indicator
-    document.getElementById('loading-indicator').style.display = 'flex';
-    document.getElementById('purchases-table').style.display = 'none';
-    
-    fetch('/api/purchases')
-        .then(response => response.json())
-        .then(purchases => {
-            const filteredPurchases = purchases.filter(purchase => 
-                purchase.vendor_name.toLowerCase().includes(searchTerm) || 
-                purchase.order_id.toLowerCase().includes(searchTerm)
-            );
-            
-            renderPurchases(filteredPurchases);
-            
-            // Hide loading indicator
-            document.getElementById('loading-indicator').style.display = 'none';
-            document.getElementById('purchases-table').style.display = 'table';
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred while searching purchases');
-            
-            // Hide loading indicator even on error
-            document.getElementById('loading-indicator').style.display = 'none';
-            document.getElementById('purchases-table').style.display = 'table';
-        });
-}
+      function filterPurchases(searchTerm) {
+          // Show loading indicator
+          document.getElementById('loading-indicator').style.display = 'flex';
+          document.getElementById('purchases-table').style.display = 'none';
+          
+          fetch('/api/purchases')
+              .then(response => {
+                  if (!response.ok) {
+                      throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                  }
+                  return response.json();
+              })
+              .then(purchases => {
+                  if (!Array.isArray(purchases)) {
+                      throw new Error('Invalid data format received from server');
+                  }
+                  
+                  const filteredPurchases = purchases.filter(purchase => 
+                      (purchase.vendor_name && purchase.vendor_name.toLowerCase().includes(searchTerm)) || 
+                      (purchase.order_id && purchase.order_id.toLowerCase().includes(searchTerm))
+                  );
+                  
+                  renderPurchases(filteredPurchases);
+                  
+                  // Hide loading indicator
+                  document.getElementById('loading-indicator').style.display = 'none';
+                  document.getElementById('purchases-table').style.display = 'table';
+              })
+              .catch(error => {
+                  console.error('Error searching purchases:', error);
+                  purchasesList.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 1rem;">Error searching purchases: ${error.message}. Please try again.</td></tr>`;
+                  alert('An error occurred while searching purchases: ' + error.message);
+                  
+                  // Hide loading indicator even on error
+                  document.getElementById('loading-indicator').style.display = 'none';
+                  document.getElementById('purchases-table').style.display = 'table';
+              });
+      }
 
-// Add renderPurchases function
-function renderPurchases(purchases) {
-    purchasesList.innerHTML = '';
-    
-    let monthTotal = 0;
-    let pendingCount = 0;
-    
-    const today = new Date();
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-    
-    purchases.forEach(purchase => {
-        const row = document.createElement('tr');
-        
-        const purchaseDate = new Date(purchase.purchase_date);
-        
-        // Calculate summary totals
-        if (purchaseDate >= monthStart) {
-            monthTotal += purchase.total_amount;
-        }
-        
-        if (purchase.status === 'Ordered' || purchase.status === 'In Transit') {
-            pendingCount++;
-        }
-        
-        // Determine status class
-        let statusClass = '';
-        switch (purchase.status) {
-            case 'Delivered':
-                statusClass = 'success';
-                break;
-            case 'In Transit':
-                statusClass = 'warning';
-                break;
-            case 'Ordered':
-                statusClass = 'info';
-                break;
-            case 'Cancelled':
-                statusClass = 'danger';
-                break;
-        }
-        
-        row.innerHTML = `
-            <td>${purchase.order_id}</td>
-            <td>${purchase.vendor_name}</td>
-            <td>${new Date(purchase.purchase_date).toLocaleDateString()}</td>
-            <td>₹${purchase.total_amount.toFixed(2)}</td>
-            <td><span style="color: ${statusClass === 'success' ? '#4caf50' : statusClass === 'warning' ? '#ff9800' : statusClass === 'danger' ? '#f44336' : '#2196f3'}; 
-                background: ${statusClass === 'success' ? 'rgba(76, 175, 80, 0.1)' : statusClass === 'warning' ? 'rgba(255, 152, 0, 0.1)' : statusClass === 'danger' ? 'rgba(244, 67, 54, 0.1)' : 'rgba(33, 150, 243, 0.1)'};
-                padding: 0.3rem 0.6rem; border-radius: 4px;">${purchase.status}</span></td>
-            <td>
-                <button class="btn btn-secondary view-purchase" data-id="${purchase.id}" data-purchase="${encodeURIComponent(JSON.stringify(purchase))}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem; margin-right: 0.5rem;">View</button>
-                <button class="btn btn-secondary update-status" data-id="${purchase.id}" data-status="${purchase.status}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem; margin-right: 0.5rem;">Update Status</button>
-                <button class="btn btn-danger delete-purchase" data-id="${purchase.id}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem;">Delete</button>
-            </td>
-        `;
-        
-        purchasesList.appendChild(row);
-    });
-    
-    // Update summary cards
-    monthPurchases.textContent = `₹${monthTotal.toFixed(2)}`;
-    pendingOrders.textContent = pendingCount;
-    
-    // Add event listeners to view, update status, and delete buttons
-    document.querySelectorAll('.view-purchase').forEach(button => {
-        button.addEventListener('click', function() {
-            const purchaseData = JSON.parse(decodeURIComponent(this.getAttribute('data-purchase')));
-            showPurchaseDetails(purchaseData);
-        });
-    });
-    
-    document.querySelectorAll('.update-status').forEach(button => {
-        button.addEventListener('click', function() {
-            const purchaseId = this.getAttribute('data-id');
-            const currentStatus = this.getAttribute('data-status');
-            
-            document.getElementById('update-purchase-id').value = purchaseId;
-            document.getElementById('update-purchase-status').value = currentStatus;
-            
-            updateStatusModal.style.display = 'block';
-        });
-    });
-    
-    document.querySelectorAll('.delete-purchase').forEach(button => {
-        button.addEventListener('click', function() {
-            const purchaseId = this.getAttribute('data-id');
-            document.getElementById('delete-purchase-id').value = purchaseId;
-            deletePurchaseModal.style.display = 'block';
-        });
-    });
-}
+      // Add renderPurchases function
+      function renderPurchases(purchases) {
+          if (!purchasesList) {
+              console.error('Purchases list element not found');
+              return;
+          }
+          
+          purchasesList.innerHTML = '';
+          
+          if (!purchases || purchases.length === 0) {
+              purchasesList.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 1rem;">No purchase records found.</td></tr>';
+              
+              // Update summary cards with zeros
+              monthPurchases.textContent = '₹0.00';
+              pendingOrders.textContent = '0';
+              return;
+          }
+          
+          let monthTotal = 0;
+          let pendingCount = 0;
+          
+          const today = new Date();
+          const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+          
+          purchases.forEach(purchase => {
+              try {
+                  const row = document.createElement('tr');
+                  
+                  let purchaseDate;
+                  try {
+                      purchaseDate = new Date(purchase.purchase_date);
+                  } catch (e) {
+                      console.error('Invalid date format:', purchase.purchase_date);
+                      purchaseDate = new Date(); // Default to today if invalid
+                  }
+                  
+                  // Calculate summary totals
+                  if (!isNaN(purchaseDate.getTime())) {
+                      if (purchaseDate >= monthStart) {
+                          monthTotal += parseFloat(purchase.total_amount) || 0;
+                      }
+                  }
+                  
+                  if (purchase.status === 'Ordered' || purchase.status === 'In Transit') {
+                      pendingCount++;
+                  }
+                  
+                  // Determine status class
+                  let statusClass = '';
+                  switch (purchase.status) {
+                      case 'Delivered':
+                          statusClass = 'success';
+                          break;
+                      case 'In Transit':
+                          statusClass = 'warning';
+                          break;
+                      case 'Ordered':
+                          statusClass = 'info';
+                          break;
+                      case 'Cancelled':
+                          statusClass = 'danger';
+                          break;
+                  }
+                  
+                  row.innerHTML = `
+                      <td>${purchase.order_id || 'N/A'}</td>
+                      <td>${purchase.vendor_name || 'Unknown'}</td>
+                      <td>${!isNaN(purchaseDate.getTime()) ? purchaseDate.toLocaleDateString() : 'Invalid date'}</td>
+                      <td>₹${typeof purchase.total_amount === 'number' ? purchase.total_amount.toFixed(2) : '0.00'}</td>
+                      <td><span style="color: ${statusClass === 'success' ? '#4caf50' : statusClass === 'warning' ? '#ff9800' : statusClass === 'danger' ? '#f44336' : '#2196f3'}; 
+                          background: ${statusClass === 'success' ? 'rgba(76, 175, 80, 0.1)' : statusClass === 'warning' ? 'rgba(255, 152, 0, 0.1)' : statusClass === 'danger' ? 'rgba(244, 67, 54, 0.1)' : 'rgba(33, 150, 243, 0.1)'};
+                          padding: 0.3rem 0.6rem; border-radius: 4px;">${purchase.status || 'Unknown'}</span></td>
+                      <td>
+                          <button class="btn btn-secondary view-purchase" data-id="${purchase.id}" data-purchase="${encodeURIComponent(JSON.stringify(purchase))}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem; margin-right: 0.5rem;">View</button>
+                          <button class="btn btn-secondary update-status" data-id="${purchase.id}" data-status="${purchase.status || ''}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem; margin-right: 0.5rem;">Update Status</button>
+                          <button class="btn btn-danger delete-purchase" data-id="${purchase.id}" style="padding: 0.3rem 0.6rem; font-size: 0.9rem;">Delete</button>
+                      </td>
+                  `;
+                  
+                  purchasesList.appendChild(row);
+              } catch (error) {
+                  console.error('Error rendering purchase row:', error, purchase);
+              }
+          });
+          
+          // Update summary cards
+          if (monthPurchases) monthPurchases.textContent = `₹${monthTotal.toFixed(2)}`;
+          if (pendingOrders) pendingOrders.textContent = pendingCount;
+          
+          // Add event listeners to view, update status, and delete buttons
+          document.querySelectorAll('.view-purchase').forEach(button => {
+              button.addEventListener('click', function() {
+                  try {
+                      const purchaseData = JSON.parse(decodeURIComponent(this.getAttribute('data-purchase')));
+                      showPurchaseDetails(purchaseData);
+                  } catch (error) {
+                      console.error('Error parsing purchase data:', error);
+                      alert('Error viewing purchase details. Please try again.');
+                  }
+              });
+          });
+          
+          document.querySelectorAll('.update-status').forEach(button => {
+              button.addEventListener('click', function() {
+                  const purchaseId = this.getAttribute('data-id');
+                  const currentStatus = this.getAttribute('data-status');
+                  
+                  document.getElementById('update-purchase-id').value = purchaseId;
+                  document.getElementById('update-purchase-status').value = currentStatus;
+                  
+                  updateStatusModal.style.display = 'block';
+              });
+          });
+          
+          document.querySelectorAll('.delete-purchase').forEach(button => {
+              button.addEventListener('click', function() {
+                  const purchaseId = this.getAttribute('data-id');
+                  document.getElementById('delete-purchase-id').value = purchaseId;
+                  deletePurchaseModal.style.display = 'block';
+              });
+          });
+      }
 
-// Add delete purchase functionality
-document.getElementById('confirm-delete-purchase').addEventListener('click', function() {
-    const purchaseId = document.getElementById('delete-purchase-id').value;
-    
-    fetch(`/api/purchases/${purchaseId}`, {
-        method: 'DELETE'
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            deletePurchaseModal.style.display = 'none';
-            loadPurchases();
-        } else {
-            alert(data.message || 'Error deleting purchase');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred while deleting the purchase');
-    });
-});
+      // Add delete purchase functionality
+      document.getElementById('confirm-delete-purchase').addEventListener('click', function() {
+          const purchaseId = document.getElementById('delete-purchase-id').value;
+          
+          fetch(`/api/purchases/${purchaseId}`, {
+              method: 'DELETE'
+          })
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+              }
+              return response.json();
+          })
+          .then(data => {
+              if (data.success) {
+                  deletePurchaseModal.style.display = 'none';
+                  loadPurchases();
+              } else {
+                  alert(data.message || 'Error deleting purchase');
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert('An error occurred while deleting the purchase: ' + error.message);
+          });
+      });
   });
 </script>
 {% endblock %}
