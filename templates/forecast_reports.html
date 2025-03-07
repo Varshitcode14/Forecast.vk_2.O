@@ -550,31 +550,78 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('report-content').style.display = 'none';
     document.getElementById('loading-indicator').style.display = 'flex';
     
+    console.log("Generating report for date range:", {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      reportType
+    });
+    
     // Fetch data for the report
     Promise.all([
-      fetch('/api/sales').then(response => response.json()),
-      fetch('/api/purchases').then(response => response.json()),
-      fetch('/api/products').then(response => response.json()),
-      fetch('/api/customers').then(response => response.json())
+      fetch('/api/sales').then(response => {
+        if (!response.ok) throw new Error(`Sales API error: ${response.status}`);
+        return response.json();
+      }),
+      fetch('/api/purchases').then(response => {
+        if (!response.ok) throw new Error(`Purchases API error: ${response.status}`);
+        return response.json();
+      }),
+      fetch('/api/products').then(response => {
+        if (!response.ok) throw new Error(`Products API error: ${response.status}`);
+        return response.json();
+      }),
+      fetch('/api/customers').then(response => {
+        if (!response.ok) throw new Error(`Customers API error: ${response.status}`);
+        return response.json();
+      })
     ])
-    .then(([sales, purchases, products, customers]) => {
+    .then(([salesResponse, purchasesResponse, products, customers]) => {
       // Hide loading indicator
       document.getElementById('loading-indicator').style.display = 'none';
       
+      // Extract sales and purchases data from paginated responses
+      const sales = salesResponse.sales || salesResponse;
+      const purchases = purchasesResponse.purchases || purchasesResponse;
+      
+      console.log("Data loaded successfully:", {
+        salesCount: sales.length,
+        purchasesCount: purchases.length,
+        productsCount: products.length,
+        customersCount: customers.length
+      });
+      
       // Filter data by date range
       const filteredSales = sales.filter(sale => {
-        const saleDate = new Date(sale.sale_date);
-        return saleDate >= startDate && saleDate <= endDate;
+        try {
+          const saleDate = new Date(sale.sale_date);
+          return saleDate >= startDate && saleDate <= endDate;
+        } catch (e) {
+          console.error("Error parsing sale date:", sale.sale_date, e);
+          return false;
+        }
       });
       
       const filteredPurchases = purchases.filter(purchase => {
-        const purchaseDate = new Date(purchase.purchase_date);
-        return purchaseDate >= startDate && purchaseDate <= endDate;
+        try {
+          const purchaseDate = new Date(purchase.purchase_date);
+          return purchaseDate >= startDate && purchaseDate <= endDate;
+        } catch (e) {
+          console.error("Error parsing purchase date:", purchase.purchase_date, e);
+          return false;
+        }
+      });
+      
+      console.log("Filtered data:", {
+        filteredSalesCount: filteredSales.length,
+        filteredPurchasesCount: filteredPurchases.length
       });
       
       // Check if there's enough data to generate a report
-      if (filteredSales.length === 0 && filteredPurchases.length === 0) {
-        // Show insufficient data message
+      // We'll consider having any data as sufficient
+      if (sales.length === 0) {
+        console.warn("No sales data available");
+        document.getElementById('data-status-message').querySelector('p').textContent = 
+          "There is no sales data available in the system. Please add sales data first.";
         document.getElementById('data-status-message').style.display = 'block';
         document.getElementById('report-content').style.display = 'none';
         return;
@@ -595,10 +642,13 @@ document.addEventListener('DOMContentLoaded', function() {
     })
     .catch(error => {
       console.error('Error fetching data:', error);
-      // Show insufficient data message
+      // Show error message
+      document.getElementById('loading-indicator').style.display = 'none';
+      document.getElementById('data-status-message').querySelector('h3').textContent = "Error Loading Data";
+      document.getElementById('data-status-message').querySelector('p').textContent = 
+        "An error occurred while loading data: " + error.message;
       document.getElementById('data-status-message').style.display = 'block';
       document.getElementById('report-content').style.display = 'none';
-      document.getElementById('loading-indicator').style.display = 'none';
     });
   }
   
@@ -876,44 +926,59 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Generate forecast data
   function generateForecastData(sales, products) {
+    console.log("Generating forecast data with", sales.length, "sales records");
+    
     // Group sales by month
     const salesByMonth = {};
     const productSalesByMonth = {};
     
     sales.forEach(sale => {
-      const saleDate = new Date(sale.sale_date);
-      const monthKey = `${saleDate.getFullYear()}-${saleDate.getMonth() + 1}`;
-      
-      if (!salesByMonth[monthKey]) {
-        salesByMonth[monthKey] = 0;
+      try {
+        const saleDate = new Date(sale.sale_date);
+        if (isNaN(saleDate.getTime())) {
+          console.warn("Invalid sale date:", sale.sale_date);
+          return; // Skip this sale
+        }
+        
+        const monthKey = `${saleDate.getFullYear()}-${saleDate.getMonth() + 1}`;
+        
+        if (!salesByMonth[monthKey]) {
+          salesByMonth[monthKey] = 0;
+        }
+        
+        salesByMonth[monthKey] += sale.total_amount;
+        
+        // Track product sales by month
+        if (Array.isArray(sale.items)) {
+          sale.items.forEach(item => {
+            if (!productSalesByMonth[item.product_id]) {
+              productSalesByMonth[item.product_id] = {};
+            }
+            
+            if (!productSalesByMonth[item.product_id][monthKey]) {
+              productSalesByMonth[item.product_id][monthKey] = {
+                quantity: 0,
+                revenue: 0
+              };
+            }
+            
+            productSalesByMonth[item.product_id][monthKey].quantity += item.quantity;
+            productSalesByMonth[item.product_id][monthKey].revenue += item.total_price;
+          });
+        }
+      } catch (e) {
+        console.error("Error processing sale for forecast:", e);
       }
-      
-      salesByMonth[monthKey] += sale.total_amount;
-      
-      // Track product sales by month
-      sale.items.forEach(item => {
-        if (!productSalesByMonth[item.product_id]) {
-          productSalesByMonth[item.product_id] = {};
-        }
-        
-        if (!productSalesByMonth[item.product_id][monthKey]) {
-          productSalesByMonth[item.product_id][monthKey] = {
-            quantity: 0,
-            revenue: 0
-          };
-        }
-        
-        productSalesByMonth[item.product_id][monthKey].quantity += item.quantity;
-        productSalesByMonth[item.product_id][monthKey].revenue += item.total_price;
-      });
     });
     
     // Sort months chronologically
     const sortedMonths = Object.keys(salesByMonth).sort();
+    console.log("Months with sales data:", sortedMonths);
     
-    // Check if we have enough data for forecasting
-    if (sortedMonths.length < 2) {
-      // Not enough data for forecasting
+    // We'll generate a forecast even with limited data
+    // If we have at least one month of data, we can make a simple projection
+    if (sortedMonths.length === 0) {
+      console.warn("No monthly sales data available for forecasting");
       document.getElementById('forecast-next-month').textContent = 'Insufficient data';
       document.getElementById('forecast-growth').textContent = 'Insufficient data';
       document.getElementById('forecast-confidence').textContent = 'Low';

@@ -1099,13 +1099,15 @@ def delete_purchase(id):
 @app.route('/api/reports', methods=['GET'])
 @login_required
 def get_reports():
-    try:
-        # Fetch reports from the database for the current user
-        reports = Report.query.filter_by(user_id=current_user.id).order_by(Report.created_at.desc()).all()
-        return jsonify([report.to_dict() for report in reports])
-    except Exception as e:
-        logger.error(f"Error in get_reports: {str(e)}")
-        return jsonify({'error': 'Failed to fetch reports'}), 500
+  try:
+      # Fetch reports from the database for the current user
+      reports = Report.query.filter_by(user_id=current_user.id).order_by(Report.created_at.desc()).all()
+      report_data = [report.to_dict() for report in reports]
+      logger.info(f"Retrieved {len(report_data)} reports for user {current_user.id}")
+      return jsonify(report_data)
+  except Exception as e:
+      logger.error(f"Error in get_reports: {str(e)}")
+      return jsonify({'error': 'Failed to fetch reports', 'message': str(e)}), 500
 
 @app.route('/api/reports', methods=['POST'])
 @login_required
@@ -1169,6 +1171,37 @@ def page_not_found(e):
 @app.errorhandler(500)
 def internal_server_error(e):
     return render_template('error.html', error="Internal server error"), 500
+
+@app.route('/api/debug/data_status')
+@login_required
+def debug_data_status():
+    """Endpoint to check data availability for debugging purposes"""
+    try:
+        sales_count = Sale.query.filter_by(user_id=current_user.id).count()
+        purchases_count = Purchase.query.filter_by(user_id=current_user.id).count()
+        products_count = Product.query.filter_by(user_id=current_user.id).count()
+        customers_count = Customer.query.filter_by(user_id=current_user.id).count()
+        vendors_count = Vendor.query.filter_by(user_id=current_user.id).count()
+        
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'sales_count': sales_count,
+                'purchases_count': purchases_count,
+                'products_count': products_count,
+                'customers_count': customers_count,
+                'vendors_count': vendors_count,
+                'user_id': current_user.id,
+                'user_email': current_user.email,
+                'timestamp': datetime.now().isoformat()
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error in debug_data_status: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
