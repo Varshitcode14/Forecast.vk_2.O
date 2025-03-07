@@ -68,6 +68,18 @@
     </div>
 </div>
 
+<!-- Add pagination controls after the table -->
+<div class="pagination-container" id="pagination-controls" style="display: none;">
+    <div class="pagination-info">
+        Showing <span id="pagination-showing">0</span> of <span id="pagination-total">0</span> sales
+    </div>
+    <div class="pagination-buttons">
+        <button id="pagination-prev" class="btn btn-secondary" disabled>Previous</button>
+        <span id="pagination-current">Page 1</span>
+        <button id="pagination-next" class="btn btn-secondary" disabled>Next</button>
+    </div>
+</div>
+
 <!-- Add Customer Modal -->
 <div id="add-customer-modal" class="modal">
     <div class="modal-content">
@@ -612,6 +624,36 @@
         transform: translateY(-15px);
     }
 }
+
+/* Add these styles for pagination in the extra_css section */
+.pagination-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+.pagination-info {
+    color: var(--text-color);
+}
+
+.pagination-buttons {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.pagination-buttons button {
+    padding: 0.5rem 1rem;
+}
+
+.pagination-buttons button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
 </style>
 {% endblock %}
 
@@ -643,6 +685,12 @@
         const customerSearch = document.getElementById('customer-search');
         const searchBtn = document.getElementById('search-btn');
         const resetSearchBtn = document.getElementById('reset-search-btn');
+        const paginationControls = document.getElementById('pagination-controls');
+        const paginationPrev = document.getElementById('pagination-prev');
+        const paginationNext = document.getElementById('pagination-next');
+        const paginationCurrent = document.getElementById('pagination-current');
+        const paginationShowing = document.getElementById('pagination-showing');
+        const paginationTotal = document.getElementById('pagination-total');
 
         // Debug element references
         console.log('Add Sale Button:', addSaleBtn);
@@ -654,6 +702,9 @@
         let customers = [];
         let products = [];
         let itemCount = 0;
+        let allSales = []; // Store all sales data
+        let currentPage = 1;
+        const salesPerPage = 10;
 
         // Add this line to ensure sales are loaded immediately
         loadSales();
@@ -1126,11 +1177,14 @@
                         console.error('Expected array but got:', typeof sales);
                         throw new Error('Invalid data format received from server');
                     }
-                    renderSales(sales);
+                    allSales = sales; // Store all sales data
+                    renderSales(getSalesForPage(currentPage));
+                    updatePagination();
                     
                     // Hide loading indicator
                     document.getElementById('loading-indicator').style.display = 'none';
                     document.getElementById('sales-table').style.display = 'table';
+                    paginationControls.style.display = allSales.length > salesPerPage ? 'flex' : 'none';
                 })
                 .catch(error => {
                     console.error('Error loading sales:', error);
@@ -1140,8 +1194,44 @@
                     // Hide loading indicator even on error
                     document.getElementById('loading-indicator').style.display = 'none';
                     document.getElementById('sales-table').style.display = 'table';
+                    paginationControls.style.display = 'none';
                 });
         }
+
+        function getSalesForPage(page) {
+            const startIndex = (page - 1) * salesPerPage;
+            const endIndex = startIndex + salesPerPage;
+            return allSales.slice(startIndex, endIndex);
+        }
+
+        function updatePagination() {
+            const totalSales = allSales.length;
+            const totalPages = Math.ceil(totalSales / salesPerPage);
+
+            paginationShowing.textContent = Math.min(currentPage * salesPerPage, totalSales);
+            paginationTotal.textContent = totalSales;
+            paginationCurrent.textContent = `Page ${currentPage} of ${totalPages}`;
+
+            paginationPrev.disabled = currentPage === 1;
+            paginationNext.disabled = currentPage === totalPages || totalPages === 0;
+        }
+
+        paginationPrev.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderSales(getSalesForPage(currentPage));
+                updatePagination();
+            }
+        });
+
+        paginationNext.addEventListener('click', () => {
+            const totalPages = Math.ceil(allSales.length / salesPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderSales(getSalesForPage(currentPage));
+                updatePagination();
+            }
+        });
 
         // Add renderSales function
         function renderSales(sales) {
@@ -1281,25 +1371,21 @@ window.addEventListener('click', function(event) {
     }
 });
 
-// Add search functionality
+// Update search button event listeners to use the updated functions
 searchBtn.addEventListener('click', function() {
     const searchTerm = customerSearch.value.toLowerCase().trim();
-    if (searchTerm) {
-        filterSales(searchTerm);
-    }
+    filterSales(searchTerm);
 });
 
 resetSearchBtn.addEventListener('click', function() {
     customerSearch.value = '';
-    loadSales();
+    loadSales(1, 50, '');
 });
 
 customerSearch.addEventListener('keyup', function(e) {
     if (e.key === 'Enter') {
         const searchTerm = customerSearch.value.toLowerCase().trim();
-        if (searchTerm) {
-            filterSales(searchTerm);
-        }
+        filterSales(searchTerm);
     }
 });
 

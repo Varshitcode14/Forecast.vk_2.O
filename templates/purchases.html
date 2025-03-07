@@ -648,6 +648,43 @@
     color: var(--secondary-color);
     font-style: italic;
 }
+
+/* Pagination styles */
+.pagination-controls {
+    margin-top: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.pagination-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.pagination-btn {
+    padding: 0.5rem 1rem;
+    min-width: 2.5rem;
+}
+
+.pagination-btn.active {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+@media (max-width: 767px) {
+    .pagination {
+        flex-direction: column;
+        align-items: center;
+    }
+}
 </style>
 {% endblock %}
 

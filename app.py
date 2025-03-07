@@ -11,6 +11,7 @@ from import_routes import import_bp
 from functools import wraps
 import time
 import logging
+from sqlalchemy import or_
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -737,11 +738,45 @@ def add_sale():
 @login_required
 def get_sales():
   try:
-      sales = Sale.query.filter_by(user_id=current_user.id).all()
-      logger.info(f"Fetched {len(sales)} sales records from database")
+      # Get pagination parameters
+      page = request.args.get('page', 1, type=int)
+      per_page = request.args.get('per_page', 50, type=int)
+      
+      # Limit per_page to prevent excessive data loads
+      per_page = min(per_page, 100)
+      
+      # Get search parameter
+      search_term = request.args.get('search', '')
+      
+      # Log request parameters
+      logger.info(f"Fetching sales: page={page}, per_page={per_page}, search={search_term}")
+      
+      # Build the base query with eager loading to reduce database hits
+      query = Sale.query.filter_by(user_id=current_user.id)
+      
+      # Add search filter if provided
+      if search_term:
+          # Join with Customer to search by customer name
+          query = query.join(Customer).filter(
+              or_(
+                  Customer.name.ilike(f"%{search_term}%"),
+                  Customer.gst_id.ilike(f"%{search_term}%")
+              )
+          )
+      
+      # Order by sale date descending (newest first)
+      query = query.order_by(Sale.sale_date.desc())
+      
+      # Execute the paginated query
+      paginated_sales = query.paginate(page=page, per_page=per_page, error_out=False)
+      
+      # Get the total count
+      total_count = paginated_sales.total
+      logger.info(f"Found {total_count} total sales, returning page {page} with {len(paginated_sales.items)} items")
+      
+      # Process the results
       result = []
-
-      for sale in sales:
+      for sale in paginated_sales.items:
           try:
               # Format date in IST - handle timezone-aware and naive datetime objects
               if sale.sale_date:
@@ -749,7 +784,7 @@ def get_sales():
                       sale_date_ist = sale.sale_date.astimezone(IST)
                   else:
                       sale_date_ist = IST.localize(sale.sale_date)
-                  date_str = sale_date_ist.strftime('%Y-%m-%d %H:%M:%S')
+                  date_str = sale_date_ist.strftime('%Y-%m-%d')
               else:
                   date_str = "N/A"
               
@@ -793,11 +828,19 @@ def get_sales():
               logger.error(f"Error processing sale {sale.id}: {str(sale_error)}")
               continue
 
-      logger.info(f"Returning {len(result)} formatted sales records")
-      return jsonify(result)
+      # Return paginated response
+      return jsonify({
+          'sales': result,
+          'pagination': {
+              'page': page,
+              'per_page': per_page,
+              'total': total_count,
+              'pages': paginated_sales.pages
+          }
+      })
   except Exception as e:
       logger.error(f"Error in get_sales: {str(e)}")
-      return jsonify({'error': 'Failed to fetch sales'}), 500
+      return jsonify({'error': 'Failed to fetch sales', 'message': str(e)}), 500
 
 @app.route('/api/sales/<int:id>', methods=['DELETE'])
 @login_required
@@ -887,69 +930,111 @@ def add_purchase():
 @app.route('/api/purchases', methods=['GET'])
 @login_required
 def get_purchases():
-  try:
-      purchases = Purchase.query.filter_by(user_id=current_user.id).all()
-      logger.info(f"Fetched {len(purchases)} purchase records from database")
-      result = []
+    try:
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        
+        # Limit per_page to prevent excessive data loads
+        per_page = min(per_page, 100)
+        
+        # Get search parameter
+        search_term = request.args.get('search', '')
+        
+        # Log request parameters
+        logger.info(f"Fetching purchases: page={page}, per_page={per_page}, search={search_term}")
+        
+        # Build the base query with eager loading to reduce database hits
+        query = Purchase.query.filter_by(user_id=current_user.id)
+        
+        # Add search filter if provided
+        if search_term:
+            # Join with Vendor to search by vendor name
+            query = query.join(Vendor).filter(
+                or_(
+                    Purchase.order_id.ilike(f"%{search_term}%"),
+                    Vendor.name.ilike(f"%{search_term}%")
+                )
+            )
+        
+        # Order by purchase date descending (newest first)
+        query = query.order_by(Purchase.purchase_date.desc())
+        
+        # Execute the paginated query
+        paginated_purchases = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        # Get the total count
+        total_count = paginated_purchases.total
+        logger.info(f"Found {total_count} total purchases, returning page {page} with {len(paginated_purchases.items)} items")
+        
+        # Process the results
+        result = []
+        for purchase in paginated_purchases.items:
+            try:
+                # Format date in IST - handle timezone-aware and naive datetime objects
+                if purchase.purchase_date:
+                    if purchase.purchase_date.tzinfo:
+                        purchase_date_ist = purchase.purchase_date.astimezone(IST)
+                    else:
+                        purchase_date_ist = IST.localize(purchase.purchase_date)
+                    date_str = purchase_date_ist.strftime('%Y-%m-%d')
+                else:
+                    date_str = "N/A"
+                
+                # Get vendor details safely
+                vendor_name = purchase.vendor.name if purchase.vendor else "Unknown"
+                vendor_gst_id = purchase.vendor.gst_id if purchase.vendor else "Unknown"
+                
+                purchase_data = {
+                    'id': purchase.id,
+                    'vendor_name': vendor_name,
+                    'vendor_gst_id': vendor_gst_id,
+                    'order_id': purchase.order_id or "N/A",
+                    'purchase_date': date_str,
+                    'delivery_charges': float(purchase.delivery_charges) if purchase.delivery_charges else 0.0,
+                    'total_amount': float(purchase.total_amount) if purchase.total_amount else 0.0,
+                    'status': purchase.status or "Unknown",
+                    'items': []
+                }
+                
+                # Process each item with error handling
+                for item in purchase.items:
+                    try:
+                        if not item.product:
+                            logger.warning(f"Purchase item {item.id} has no associated product")
+                            continue
+                            
+                        item_data = {
+                            'product_name': item.product.name,
+                            'product_id': item.product.product_id,
+                            'quantity': item.quantity,
+                            'gst_percentage': float(item.gst_percentage) if item.gst_percentage else 0.0,
+                            'unit_price': float(item.unit_price) if item.unit_price else 0.0,
+                            'total_price': float(item.total_price) if item.total_price else 0.0
+                        }
+                        purchase_data['items'].append(item_data)
+                    except Exception as item_error:
+                        logger.error(f"Error processing purchase item {item.id}: {str(item_error)}")
+                        continue
+                
+                result.append(purchase_data)
+            except Exception as purchase_error:
+                logger.error(f"Error processing purchase {purchase.id}: {str(purchase_error)}")
+                continue
 
-      for purchase in purchases:
-          try:
-              # Format date in IST - handle timezone-aware and naive datetime objects
-              if purchase.purchase_date:
-                  if purchase.purchase_date.tzinfo:
-                      purchase_date_ist = purchase.purchase_date.astimezone(IST)
-                  else:
-                      purchase_date_ist = IST.localize(purchase.purchase_date)
-                  date_str = purchase_date_ist.strftime('%Y-%m-%d')
-              else:
-                  date_str = "N/A"
-              
-              # Get vendor details safely
-              vendor_name = purchase.vendor.name if purchase.vendor else "Unknown"
-              vendor_gst_id = purchase.vendor.gst_id if purchase.vendor else "Unknown"
-              
-              purchase_data = {
-                  'id': purchase.id,
-                  'vendor_name': vendor_name,
-                  'vendor_gst_id': vendor_gst_id,
-                  'order_id': purchase.order_id or "N/A",
-                  'purchase_date': date_str,
-                  'delivery_charges': float(purchase.delivery_charges) if purchase.delivery_charges else 0.0,
-                  'total_amount': float(purchase.total_amount) if purchase.total_amount else 0.0,
-                  'status': purchase.status or "Unknown",
-                  'items': []
-              }
-              
-              # Process each item with error handling
-              for item in purchase.items:
-                  try:
-                      if not item.product:
-                          logger.warning(f"Purchase item {item.id} has no associated product")
-                          continue
-                          
-                      item_data = {
-                          'product_name': item.product.name,
-                          'product_id': item.product.product_id,
-                          'quantity': item.quantity,
-                          'gst_percentage': float(item.gst_percentage) if item.gst_percentage else 0.0,
-                          'unit_price': float(item.unit_price) if item.unit_price else 0.0,
-                          'total_price': float(item.total_price) if item.total_price else 0.0
-                      }
-                      purchase_data['items'].append(item_data)
-                  except Exception as item_error:
-                      logger.error(f"Error processing purchase item {item.id}: {str(item_error)}")
-                      continue
-              
-              result.append(purchase_data)
-          except Exception as purchase_error:
-              logger.error(f"Error processing purchase {purchase.id}: {str(purchase_error)}")
-              continue
-
-      logger.info(f"Returning {len(result)} formatted purchase records")
-      return jsonify(result)
-  except Exception as e:
-      logger.error(f"Error in get_purchases: {str(e)}")
-      return jsonify({'error': 'Failed to fetch purchases'}), 500
+        # Return paginated response
+        return jsonify({
+            'purchases': result,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': total_count,
+                'pages': paginated_purchases.pages
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error in get_purchases: {str(e)}")
+        return jsonify({'error': 'Failed to fetch purchases', 'message': str(e)}), 500
 
 @app.route('/api/purchases/<int:id>', methods=['PUT'])
 @login_required
