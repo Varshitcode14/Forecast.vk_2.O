@@ -64,6 +64,18 @@
     </table>
 </div>
 
+<!-- Add pagination controls after the table -->
+<div class="pagination-container" id="pagination-controls" style="display: none;">
+    <div class="pagination-info">
+        Showing <span id="pagination-showing">0</span> of <span id="pagination-total">0</span> purchases
+    </div>
+    <div class="pagination-buttons">
+        <button id="pagination-prev" class="btn btn-secondary" disabled>Previous</button>
+        <span id="pagination-current">Page 1</span>
+        <button id="pagination-next" class="btn btn-secondary" disabled>Next</button>
+    </div>
+</div>
+
 <!-- Add Vendor Modal -->
 <div id="add-vendor-modal" class="modal">
   <div class="modal-content">
@@ -650,6 +662,35 @@
 }
 
 /* Pagination styles */
+.pagination-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+.pagination-info {
+    color: var(--text-color);
+}
+
+.pagination-buttons {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.pagination-buttons button {
+    padding: 0.5rem 1rem;
+}
+
+.pagination-buttons button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .pagination-controls {
     margin-top: 1.5rem;
     margin-bottom: 1.5rem;
@@ -718,11 +759,14 @@
       const vendorSearch = document.getElementById('vendor-search');
       const searchBtn = document.getElementById('search-btn');
       const resetSearchBtn = document.getElementById('reset-search-btn');
+      const paginationControls = document.getElementById('pagination-controls');
 
       // Global variables
       let vendors = [];
       let products = [];
       let itemCount = 0;
+      let currentPage = 1;
+      let totalPages = 1;
 
       // Close buttons
       const closeButtons = document.querySelectorAll('.close');
@@ -1231,13 +1275,21 @@
           purchaseTotalAmount.value = '';
       }
 
-      // Load Purchases
-      function loadPurchases() {
+      // Load Purchases with pagination
+      function loadPurchases(page = 1, per_page = 50, search = '') {
+          console.log(`Loading purchases data (page ${page})...`);
+          
           // Show loading indicator
           document.getElementById('loading-indicator').style.display = 'flex';
           document.getElementById('purchases-table').style.display = 'none';
           
-          fetch('/api/purchases')
+          // Build the URL with query parameters
+          let url = `/api/purchases?page=${page}&per_page=${per_page}`;
+          if (search) {
+              url += `&search=${encodeURIComponent(search)}`;
+          }
+          
+          fetch(url)
               .then(response => {
                   console.log('Purchases API response status:', response.status);
                   if (!response.ok) {
@@ -1245,17 +1297,27 @@
                   }
                   return response.json();
               })
-              .then(purchases => {
-                  console.log('Purchases data loaded:', purchases.length, 'records');
-                  if (!Array.isArray(purchases)) {
-                      console.error('Expected array but got:', typeof purchases);
+              .then(data => {
+                  console.log('Purchases data received from server');
+                  
+                  // Check if the response has the expected structure
+                  if (!data || !data.purchases || !Array.isArray(data.purchases)) {
+                      console.error('Unexpected data format:', data);
                       throw new Error('Invalid data format received from server');
                   }
+                  
+                  const purchases = data.purchases;
+                  const pagination = data.pagination;
+                  
+                  console.log(`Loaded ${purchases.length} purchase records (page ${pagination.page} of ${pagination.pages})`);
+                  
                   renderPurchases(purchases);
+                  updatePagination(pagination);
                   
                   // Hide loading indicator
                   document.getElementById('loading-indicator').style.display = 'none';
                   document.getElementById('purchases-table').style.display = 'table';
+                  paginationControls.style.display = pagination.pages > 1 ? 'flex' : 'none';
               })
               .catch(error => {
                   console.error('Error loading purchases:', error);
@@ -1267,6 +1329,32 @@
                   document.getElementById('purchases-table').style.display = 'table';
               });
       }
+
+      function updatePagination(pagination) {
+          document.getElementById('pagination-showing').textContent = Math.min(pagination.page * pagination.per_page, pagination.total);
+          document.getElementById('pagination-total').textContent = pagination.total;
+          document.getElementById('pagination-current').textContent = `Page ${pagination.page} of ${pagination.pages}`;
+
+          document.getElementById('pagination-prev').disabled = pagination.page === 1;
+          document.getElementById('pagination-next').disabled = pagination.page === pagination.pages || pagination.pages === 0;
+          
+          // Store current page and total pages for navigation
+          currentPage = pagination.page;
+          totalPages = pagination.pages;
+      }
+
+      // Add pagination event listeners
+      document.getElementById('pagination-prev').addEventListener('click', () => {
+          if (currentPage > 1) {
+              loadPurchases(currentPage - 1);
+          }
+      });
+
+      document.getElementById('pagination-next').addEventListener('click', () => {
+          if (currentPage < totalPages) {
+              loadPurchases(currentPage + 1);
+          }
+      });
 
       // Show Purchase Details
       function showPurchaseDetails(purchase) {
@@ -1407,42 +1495,16 @@
       });
 
       function filterPurchases(searchTerm) {
+          if (!searchTerm || searchTerm.trim() === '') {
+              loadPurchases(1);
+              return;
+          }
+          
           // Show loading indicator
           document.getElementById('loading-indicator').style.display = 'flex';
           document.getElementById('purchases-table').style.display = 'none';
           
-          fetch('/api/purchases')
-              .then(response => {
-                  if (!response.ok) {
-                      throw new Error(`Server returned ${response.status}: ${response.statusText}`);
-                  }
-                  return response.json();
-              })
-              .then(purchases => {
-                  if (!Array.isArray(purchases)) {
-                      throw new Error('Invalid data format received from server');
-                  }
-                  
-                  const filteredPurchases = purchases.filter(purchase => 
-                      (purchase.vendor_name && purchase.vendor_name.toLowerCase().includes(searchTerm)) || 
-                      (purchase.order_id && purchase.order_id.toLowerCase().includes(searchTerm))
-                  );
-                  
-                  renderPurchases(filteredPurchases);
-                  
-                  // Hide loading indicator
-                  document.getElementById('loading-indicator').style.display = 'none';
-                  document.getElementById('purchases-table').style.display = 'table';
-              })
-              .catch(error => {
-                  console.error('Error searching purchases:', error);
-                  purchasesList.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 1rem;">Error searching purchases: ${error.message}. Please try again.</td></tr>`;
-                  alert('An error occurred while searching purchases: ' + error.message);
-                  
-                  // Hide loading indicator even on error
-                  document.getElementById('loading-indicator').style.display = 'none';
-                  document.getElementById('purchases-table').style.display = 'table';
-              });
+          loadPurchases(1, 50, searchTerm);
       }
 
       // Add renderPurchases function

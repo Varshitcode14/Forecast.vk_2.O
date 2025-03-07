@@ -704,6 +704,8 @@
         let itemCount = 0;
         let allSales = []; // Store all sales data
         let currentPage = 1;
+        let totalPages = 1;
+        let totalSales = 0;
         const salesPerPage = 10;
 
         // Add this line to ensure sales are loaded immediately
@@ -716,6 +718,7 @@
                 addSaleModal.style.display = 'none';
                 addCustomerModal.style.display = 'none';
                 viewSaleModal.style.display = 'none';
+                deleteSaleModal.style.display = 'none';
                 deleteSaleModal.style.display = 'none';
             });
         });
@@ -1155,15 +1158,21 @@
             totalAmount.value = '';
         }
 
-        // Load Sales
-        function loadSales() {
-            console.log('Loading sales data...');
+        // Load Sales with pagination
+        function loadSales(page = 1, per_page = 50, search = '') {
+            console.log(`Loading sales data (page ${page})...`);
             
             // Show loading indicator
             document.getElementById('loading-indicator').style.display = 'flex';
             document.getElementById('sales-table').style.display = 'none';
             
-            fetch('/api/sales')
+            // Build the URL with query parameters
+            let url = `/api/sales?page=${page}&per_page=${per_page}`;
+            if (search) {
+                url += `&search=${encodeURIComponent(search)}`;
+            }
+            
+            fetch(url)
                 .then(response => {
                     console.log('Sales API response status:', response.status);
                     if (!response.ok) {
@@ -1171,20 +1180,32 @@
                     }
                     return response.json();
                 })
-                .then(sales => {
-                    console.log('Sales data loaded:', sales.length, 'records');
-                    if (!Array.isArray(sales)) {
-                        console.error('Expected array but got:', typeof sales);
+                .then(data => {
+                    console.log('Sales data received from server');
+                    
+                    // Check if the response has the expected structure
+                    if (!data || !data.sales || !Array.isArray(data.sales)) {
+                        console.error('Unexpected data format:', data);
                         throw new Error('Invalid data format received from server');
                     }
-                    allSales = sales; // Store all sales data
-                    renderSales(getSalesForPage(currentPage));
-                    updatePagination();
+                    
+                    const sales = data.sales;
+                    const pagination = data.pagination;
+                    
+                    console.log(`Loaded ${sales.length} sales records (page ${pagination.page} of ${pagination.pages})`);
+                    
+                    allSales = sales; // Store current page sales data
+                    totalSales = pagination.total; // Store total count
+                    totalPages = pagination.pages; // Store total pages
+                    currentPage = pagination.page; // Update current page
+                    
+                    renderSales(sales);
+                    updatePagination(pagination);
                     
                     // Hide loading indicator
                     document.getElementById('loading-indicator').style.display = 'none';
                     document.getElementById('sales-table').style.display = 'table';
-                    paginationControls.style.display = allSales.length > salesPerPage ? 'flex' : 'none';
+                    paginationControls.style.display = pagination.pages > 1 ? 'flex' : 'none';
                 })
                 .catch(error => {
                     console.error('Error loading sales:', error);
@@ -1198,38 +1219,24 @@
                 });
         }
 
-        function getSalesForPage(page) {
-            const startIndex = (page - 1) * salesPerPage;
-            const endIndex = startIndex + salesPerPage;
-            return allSales.slice(startIndex, endIndex);
-        }
+        function updatePagination(pagination) {
+            paginationShowing.textContent = Math.min(pagination.page * pagination.per_page, pagination.total);
+            paginationTotal.textContent = pagination.total;
+            paginationCurrent.textContent = `Page ${pagination.page} of ${pagination.pages}`;
 
-        function updatePagination() {
-            const totalSales = allSales.length;
-            const totalPages = Math.ceil(totalSales / salesPerPage);
-
-            paginationShowing.textContent = Math.min(currentPage * salesPerPage, totalSales);
-            paginationTotal.textContent = totalSales;
-            paginationCurrent.textContent = `Page ${currentPage} of ${totalPages}`;
-
-            paginationPrev.disabled = currentPage === 1;
-            paginationNext.disabled = currentPage === totalPages || totalPages === 0;
+            paginationPrev.disabled = pagination.page === 1;
+            paginationNext.disabled = pagination.page === pagination.pages || pagination.pages === 0;
         }
 
         paginationPrev.addEventListener('click', () => {
             if (currentPage > 1) {
-                currentPage--;
-                renderSales(getSalesForPage(currentPage));
-                updatePagination();
+                loadSales(currentPage - 1);
             }
         });
 
         paginationNext.addEventListener('click', () => {
-            const totalPages = Math.ceil(allSales.length / salesPerPage);
             if (currentPage < totalPages) {
-                currentPage++;
-                renderSales(getSalesForPage(currentPage));
-                updatePagination();
+                loadSales(currentPage + 1);
             }
         });
 
@@ -1390,32 +1397,16 @@ customerSearch.addEventListener('keyup', function(e) {
 });
 
 function filterSales(searchTerm) {
+    if (!searchTerm || searchTerm.trim() === '') {
+        loadSales(1);
+        return;
+    }
+    
     // Show loading indicator
     document.getElementById('loading-indicator').style.display = 'flex';
     document.getElementById('sales-table').style.display = 'none';
     
-    fetch('/api/sales')
-        .then(response => response.json())
-        .then(sales => {
-            const filteredSales = sales.filter(sale => 
-                sale.customer_name.toLowerCase().includes(searchTerm) || 
-                sale.customer_gst_id.toLowerCase().includes(searchTerm)
-            );
-            
-            renderSales(filteredSales);
-            
-            // Hide loading indicator
-            document.getElementById('loading-indicator').style.display = 'none';
-            document.getElementById('sales-table').style.display = 'table';
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred while searching sales');
-            
-            // Hide loading indicator even on error
-            document.getElementById('loading-indicator').style.display = 'none';
-            document.getElementById('sales-table').style.display = 'table';
-        });
+    loadSales(1, 50, searchTerm);
 }
 
         // Show Sale Details
