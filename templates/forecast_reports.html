@@ -1133,62 +1133,82 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   
   // Generate product forecasts
-  function generateProductForecasts(productSalesByMonth, products, recentMonths, forecastMonthLabels) {
+  async function generateProductForecasts(productSalesByMonth, products, recentMonths, forecastMonthLabels) {
     const forecastTableBody = document.getElementById('forecast-body');
     const productForecasts = [];
     
+    console.log("Generating ARIMA forecasts for products...");
+    
     // Process each product
-    Object.entries(productSalesByMonth).forEach(([productId, monthlySales]) => {
+    for (const [productId, monthlySales] of Object.entries(productSalesByMonth)) {
       const product = products.find(p => p.product_id === productId);
-      if (!product) return;
+      if (!product) continue;
       
-      // Get recent sales data
-      const recentSalesData = recentMonths.map(month => 
-        (monthlySales[month] && monthlySales[month].quantity) || 0
-      );
+      // Get recent sales data (last 12 months)
+      const salesData = [];
+      const allMonths = Object.keys(monthlySales).sort();
       
-      // Calculate growth rate
-      let growthRate = 0;
-      if (recentSalesData.length >= 2) {
-        let totalGrowth = 0;
-        let validMonths = 0;
+      // Get last 12 months of data
+      for (let i = Math.max(0, allMonths.length - 12); i < allMonths.length; i++) {
+        const month = allMonths[i];
+        salesData.push(monthlySales[month] ? monthlySales[month].quantity : 0);
+      }
+      
+      try {
+        // Call ARIMA API
+        const response = await fetch('/api/arima_forecast', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            sales_data: salesData,
+            steps: 3,
+            product_name: product.name
+          })
+        });
         
-        for (let i = 1; i < recentSalesData.length; i++) {
-          if (recentSalesData[i-1] > 0) {
-            totalGrowth += (recentSalesData[i] - recentSalesData[i-1]) / recentSalesData[i-1];
-            validMonths++;
-          }
+        const result = await response.json();
+        
+        if (result.success) {
+          const forecastData = result.forecast;
+          const method = result.method;
+          
+          // Calculate trend
+          let trend = 'Stable';
+          const currentMonth = salesData[salesData.length - 1] || 0;
+          const nextMonth = forecastData[0] || 0;
+          
+          if (nextMonth > currentMonth * 1.1) trend = 'Increasing';
+          else if (nextMonth < currentMonth * 0.9) trend = 'Decreasing';
+          
+          // Add to product forecasts
+          productForecasts.push({
+            name: product.name,
+            currentMonth: currentMonth,
+            forecast: forecastData.map(f => Math.round(f)),
+            trend: trend,
+            method: method
+          });
+          
+          console.log(`${method.toUpperCase()} forecast for ${product.name}:`, forecastData);
         }
+      } catch (error) {
+        console.error(`Error forecasting for ${product.name}:`, error);
         
-        growthRate = validMonths > 0 ? totalGrowth / validMonths : 0;
+        // Fallback to simple forecast
+        const currentMonth = salesData[salesData.length - 1] || 0;
+        const avg = salesData.length > 0 ? salesData.reduce((a, b) => a + b, 0) / salesData.length : 0;
+        
+        productForecasts.push({
+          name: product.name,
+          currentMonth: currentMonth,
+          forecast: [Math.round(avg), Math.round(avg), Math.round(avg)],
+          trend: 'Stable',
+          method: 'fallback'
+        });
       }
-      
-      // Cap growth rate
-      growthRate = Math.max(-0.3, Math.min(0.4, growthRate));
-      
-      // Calculate moving average
-      const movingAvgPeriod = Math.min(3, recentSalesData.length);
-      const movingAvg = recentSalesData.slice(-movingAvgPeriod).reduce((sum, val) => sum + val, 0) / movingAvgPeriod;
-      
-      // Generate forecast for next 3 months
-      const forecastData = [];
-      for (let i = 1; i <= 3; i++) {
-        forecastData.push(Math.round(movingAvg * Math.pow(1 + growthRate, i)));
-      }
-      
-      // Determine trend
-      let trend = 'Stable';
-      if (growthRate > 0.05) trend = 'Increasing';
-      else if (growthRate < -0.05) trend = 'Decreasing';
-      
-      // Add to product forecasts
-      productForecasts.push({
-        name: product.name,
-        currentMonth: recentSalesData[recentSalesData.length - 1] || 0,
-        forecast: forecastData,
-        trend: trend
-      });
-    });
+    }
     
     // Sort by current month sales (descending)
     productForecasts.sort((a, b) => b.currentMonth - a.currentMonth);
@@ -1207,10 +1227,11 @@ document.addEventListener('DOMContentLoaded', function() {
     topProductForecasts.forEach(forecast => {
       const trendClass = forecast.trend === 'Increasing' ? 'up' : (forecast.trend === 'Decreasing' ? 'down' : '');
       const trendIcon = forecast.trend === 'Increasing' ? '↑' : (forecast.trend === 'Decreasing' ? '↓' : '→');
+      const methodBadge = forecast.method === 'arima' ? '🤖 ARIMA' : (forecast.method === 'moving_average' ? '📊 Avg' : '⚡ Simple');
       
       rowsHTML += `
         <tr>
-          <td>${forecast.name}</td>
+          <td>${forecast.name} <small style="color: #888;">(${methodBadge})</small></td>
           <td>${forecast.currentMonth}</td>
           <td>${forecast.forecast[0]}</td>
           <td>${forecast.forecast[1]}</td>
@@ -1287,4 +1308,3 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
-

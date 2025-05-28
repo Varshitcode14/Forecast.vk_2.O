@@ -12,16 +12,26 @@ from functools import wraps
 import time
 import logging
 from sqlalchemy import or_
+import pandas as pd
+import numpy as np
 
-# Configure logging
+# Configure logging FIRST - before any other code
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+try:
+    from statsmodels.tsa.arima.model import ARIMA
+    ARIMA_AVAILABLE = True
+    logger.info("ARIMA library loaded successfully")
+except ImportError:
+    ARIMA_AVAILABLE = False
+    logger.warning("ARIMA not available. Install statsmodels for advanced forecasting.")
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'production-key-for-deployment')
 
 # Direct database configuration with the new URL
-database_url = "postgresql://forecast_may_user:iDYGvjoHXOBI9JnAl8v3Xn4l5G9yywm6@dpg-d0fd0qruibrs73eipseg-a.oregon-postgres.render.com/forecast_may"
+database_url = "postgresql://forecast_vk_3_o_user:kt6HkdhXcO8D7IhYBHJXj6bfimJpw4vj@dpg-cv508d0fnakc7385p35g-a.oregon-postgres.render.com/forecast_vk_3_o"
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_size': 10,
@@ -123,6 +133,50 @@ def create_admin_user():
         logger.error(f"Error creating admin user: {str(e)}")
         db.session.rollback()
         return False
+
+def arima_forecast(sales_data, steps=3):
+    """
+    Generate ARIMA forecast for sales data
+    """
+    try:
+        if not ARIMA_AVAILABLE:
+            return None
+            
+        # Convert to pandas series
+        if len(sales_data) < 10:  # Need minimum data for ARIMA
+            return None
+            
+        # Remove zeros and handle missing data
+        sales_series = pd.Series(sales_data)
+        sales_series = sales_series.replace(0, np.nan).fillna(method='ffill').fillna(method='bfill')
+        
+        if sales_series.isna().all() or len(sales_series.dropna()) < 5:
+            return None
+            
+        # Try different ARIMA orders and pick the best one
+        best_aic = float('inf')
+        best_forecast = None
+        
+        # Simple grid search for best parameters
+        for p in [0, 1, 2]:
+            for d in [0, 1]:
+                for q in [0, 1, 2]:
+                    try:
+                        model = ARIMA(sales_series.dropna(), order=(p, d, q))
+                        fitted_model = model.fit()
+                        
+                        if fitted_model.aic < best_aic:
+                            best_aic = fitted_model.aic
+                            forecast_result = fitted_model.forecast(steps=steps)
+                            best_forecast = forecast_result.tolist() if hasattr(forecast_result, 'tolist') else list(forecast_result)
+                    except:
+                        continue
+        
+        return best_forecast
+        
+    except Exception as e:
+        logger.error(f"ARIMA forecasting error: {str(e)}")
+        return None
 
 # Create tables and initialize admin user with better error handling
 with app.app_context():
@@ -740,7 +794,7 @@ def get_sales():
   try:
       # Get pagination parameters
       page = request.args.get('page', 1, type=int)
-      per_page = request.args.get('per_page', 50, type=int)
+      per_page = request.args.get('per_page', 1, type=int)
       
       # Limit per_page to prevent excessive data loads
       per_page = min(per_page, 100)
@@ -1130,6 +1184,56 @@ def get_report(id):
         logger.error(f"Error in get_report: {str(e)}")
         return jsonify({'error': 'Failed to fetch report'}), 500
 
+@app.route('/api/arima_forecast', methods=['POST'])
+@login_required
+def get_arima_forecast():
+    """
+    Generate ARIMA forecast for given sales data
+    """
+    try:
+        data = request.json
+        sales_data = data.get('sales_data', [])
+        steps = data.get('steps', 3)
+        product_name = data.get('product_name', 'Unknown')
+        
+        logger.info(f"ARIMA forecast request for {product_name} with {len(sales_data)} data points")
+        
+        # Generate ARIMA forecast
+        arima_result = arima_forecast(sales_data, steps)
+        
+        if arima_result is None:
+            # Fallback to simple moving average
+            if len(sales_data) == 0:
+                fallback_forecast = [0] * steps
+            else:
+                avg = sum(sales_data[-3:]) / min(3, len(sales_data))
+                fallback_forecast = [max(0, avg)] * steps
+            
+            return jsonify({
+                'success': True,
+                'forecast': fallback_forecast,
+                'method': 'moving_average',
+                'message': 'Used moving average due to insufficient data for ARIMA'
+            })
+        
+        # Ensure non-negative forecasts
+        arima_result = [max(0, x) for x in arima_result]
+        
+        return jsonify({
+            'success': True,
+            'forecast': arima_result,
+            'method': 'arima',
+            'message': 'ARIMA forecast generated successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in ARIMA forecast API: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'method': 'error'
+        }), 500
+
 # Setup scheduler for daily reports
 try:
     from apscheduler.schedulers.background import BackgroundScheduler
@@ -1205,4 +1309,3 @@ def debug_data_status():
 
 if __name__ == '__main__':
     app.run(debug=True)
-
