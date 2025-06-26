@@ -31,7 +31,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'production-key-for-deployment')
 
 # Direct database configuration with the new URL
-database_url = "postgresql://forecast_may_user:iDYGvjoHXOBI9JnAl8v3Xn4l5G9yywm6@dpg-d0fd0qruibrs73eipseg-a.oregon-postgres.render.com/forecast_may"
+database_url = "postgresql://google_forecast_z198_user:PGsRA6pDJHi0lbOGof8cVAHRssB9Ac9Q@dpg-d1emspumcj7s738kuvg0-a.oregon-postgres.render.com/google_forecast_z198"
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_size': 10,
