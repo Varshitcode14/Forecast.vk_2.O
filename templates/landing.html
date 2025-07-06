@@ -405,37 +405,25 @@
 </div>
 
 <script>
-console.log('Landing page script loaded');
-
 // Demo Modal Functions
 function showDemoModal() {
-  console.log('Showing demo modal');
   const modal = document.getElementById('demoModal');
   if (modal) {
     modal.style.display = 'block';
-    console.log('Modal display set to block');
-  } else {
-    console.error('Modal element not found');
   }
 }
 
 function closeDemoModal() {
-  console.log('Closing demo modal');
   const modal = document.getElementById('demoModal');
   if (modal) {
     modal.style.display = 'none';
-    // Don't set localStorage so it shows every time for demo purposes
-    console.log('Modal closed');
   }
 }
 
 // Wait for DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', function() {
-  console.log('DOM loaded, setting up modal');
-  
   // Show modal after 2 seconds
   setTimeout(function() {
-    console.log('Timeout triggered, showing modal');
     showDemoModal();
   }, 2000);
   
@@ -446,20 +434,16 @@ document.addEventListener('DOMContentLoaded', function() {
   
   if (closeBtn) {
     closeBtn.addEventListener('click', closeDemoModal);
-    console.log('Close button listener added');
   }
   
   if (closeDemoBtn) {
     closeDemoBtn.addEventListener('click', closeDemoModal);
-    console.log('Close demo button listener added');
   }
   
   if (tryDemoBtn) {
     tryDemoBtn.addEventListener('click', function() {
-      console.log('Try demo button clicked');
       window.location.href = '/login';
     });
-    console.log('Try demo button listener added');
   }
   
   // Close modal when clicking outside
@@ -476,20 +460,6 @@ document.addEventListener('DOMContentLoaded', function() {
       closeDemoModal();
     }
   });
-  
-  console.log('All event listeners set up');
-});
-
-// Also try to show modal when window loads (backup)
-window.addEventListener('load', function() {
-  console.log('Window loaded');
-  setTimeout(function() {
-    const modal = document.getElementById('demoModal');
-    if (modal && modal.style.display !== 'block') {
-      console.log('Backup modal show triggered');
-      showDemoModal();
-    }
-  }, 1000);
 });
 </script>
 </body>
