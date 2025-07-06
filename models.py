@@ -176,4 +176,3 @@ class Report(db.Model):
             'out_of_stock_count': self.out_of_stock_count,
             'created_at': self.created_at.isoformat()
         }
-

@@ -92,9 +92,243 @@
       gap: 1rem;
     }
   }
+
+/* Demo Modal Styles */
+.demo-modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(5px);
+}
+
+.demo-modal-content {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  margin: 5% auto;
+  padding: 0;
+  border-radius: 15px;
+  width: 90%;
+  max-width: 600px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  animation: modalSlideIn 0.3s ease-out;
+  color: white;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.demo-modal-header {
+  padding: 25px 30px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.demo-modal-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.demo-close {
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.3s;
+}
+
+.demo-close:hover {
+  opacity: 1;
+}
+
+.demo-modal-body {
+  padding: 25px 30px;
+}
+
+.demo-info p {
+  margin-bottom: 15px;
+  line-height: 1.6;
+}
+
+.demo-credentials {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  border-radius: 10px;
+  margin: 20px 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.demo-credentials h3 {
+  margin: 0 0 15px 0;
+  color: #ffd700;
+}
+
+.credential-box {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 15px;
+  border-radius: 8px;
+  font-family: 'Courier New', monospace;
+}
+
+.credential-text {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.demo-features {
+  margin: 20px 0;
+}
+
+.demo-features h3 {
+  margin: 0 0 15px 0;
+  color: #ffd700;
+}
+
+.demo-features ul {
+  list-style: none;
+  padding: 0;
+}
+
+.demo-features li {
+  padding: 5px 0;
+  font-size: 0.95rem;
+}
+
+.demo-note {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 15px;
+  border-radius: 8px;
+  border-left: 4px solid #ffd700;
+  margin-top: 20px;
+}
+
+.demo-modal-footer {
+  padding: 20px 30px 30px;
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+}
+
+.demo-btn {
+  padding: 12px 25px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.demo-btn-primary {
+  background: #ffd700;
+  color: #333;
+}
+
+.demo-btn-primary:hover {
+  background: #ffed4e;
+  transform: translateY(-2px);
+}
+
+.demo-btn-secondary {
+  background: transparent;
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.demo-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+@media (max-width: 768px) {
+  .demo-modal-content {
+    width: 95%;
+    margin: 10% auto;
+  }
+  
+  .demo-modal-header,
+  .demo-modal-body,
+  .demo-modal-footer {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  
+  .demo-modal-footer {
+    flex-direction: column;
+  }
+  
+  .demo-btn {
+    width: 100%;
+  }
+}
 </style>
 </head>
 <body>
+<!-- Demo Modal -->
+<div id="demoModal" class="demo-modal">
+  <div class="demo-modal-content">
+    <div class="demo-modal-header">
+      <h2>🚀 Demo Access for Recruiters & Evaluators</h2>
+      <span class="demo-close">&times;</span>
+    </div>
+    <div class="demo-modal-body">
+      <div class="demo-info">
+        <p><strong>Welcome to Forecast.vk Demo!</strong></p>
+        <p>This business management platform includes pre-loaded sample data to showcase all features including sales tracking, inventory management, purchase orders, and business analytics.</p>
+        
+        <div class="demo-credentials">
+          <h3>🔑 Demo Login Credentials:</h3>
+          <div class="credential-box">
+            <p><strong>Email:</strong> <span class="credential-text">Recruiter@gmail.com</span></p>
+            <p><strong>Password:</strong> <span class="credential-text">Recruit@100%</span></p>
+          </div>
+        </div>
+        
+        <div class="demo-features">
+          <h3>📊 What you'll see:</h3>
+          <ul>
+            <li>✅ Sample sales transactions and customer data</li>
+            <li>✅ Purchase orders and vendor management</li>
+            <li>✅ Real-time inventory tracking</li>
+            <li>✅ Business insights and analytics</li>
+            <li>✅ Data import/export functionality</li>
+            <li>✅ Demand forecasting algorithms</li>
+          </ul>
+        </div>
+        
+        <div class="demo-note">
+          <p><em>Note: This is a demonstration environment with pre-uploaded sample data. All features are fully functional for evaluation purposes.</em></p>
+        </div>
+      </div>
+    </div>
+    <div class="demo-modal-footer">
+      <button class="demo-btn demo-btn-primary" onclick="window.location.href='/login'">
+        🚀 Try Demo Now
+      </button>
+      <button class="demo-btn demo-btn-secondary" onclick="closeDemoModal()">
+        Continue Browsing
+      </button>
+    </div>
+  </div>
+</div>
 <div class="landing-container">
   <header class="landing-header">
     <div class="container" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
@@ -153,6 +387,41 @@
     </div>
   </footer>
 </div>
+<script>
+// Demo Modal Functions
+function showDemoModal() {
+  document.getElementById('demoModal').style.display = 'block';
+}
+
+function closeDemoModal() {
+  document.getElementById('demoModal').style.display = 'none';
+  localStorage.setItem('demoModalShown', 'true');
+}
+
+// Show modal on page load (only if not shown before in this session)
+document.addEventListener('DOMContentLoaded', function() {
+  if (!localStorage.getItem('demoModalShown')) {
+    setTimeout(showDemoModal, 1000); // Show after 1 second
+  }
+});
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+  const modal = document.getElementById('demoModal');
+  if (event.target === modal) {
+    closeDemoModal();
+  }
+}
+
+// Close modal with Escape key
+document.addEventListener('keydown', function(event) {
+  if (event.key === 'Escape') {
+    closeDemoModal();
+  }
+});
+
+// Close button functionality
+document.querySelector('.demo-close').onclick = closeDemoModal;
+</script>
 </body>
 </html>
-
