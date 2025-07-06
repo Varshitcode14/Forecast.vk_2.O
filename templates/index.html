@@ -1,419 +1,166 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Forecast.vk</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        .demo-banner {
-            background: linear-gradient(135deg, #1a1a1a 0%, #333 100%);
-            color: white;
-            padding: 12px 20px;
-            text-align: center;
-            border-bottom: 2px solid #ffd700;
-            position: relative;
-            overflow: hidden;
-            margin-bottom: 1rem;
-        }
-        
-        .demo-banner::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.1), transparent);
-            animation: shimmer 3s infinite;
-        }
-        
-        @keyframes shimmer {
-            0% { left: -100%; }
-            100% { left: 100%; }
-        }
-        
-        .demo-banner-content {
-            position: relative;
-            z-index: 1;
-        }
-        
-        .demo-banner h3 {
-            margin: 0 0 5px 0;
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
-        
-        .demo-banner p {
-            margin: 0;
-            font-size: 0.9rem;
-            opacity: 0.9;
-        }
-        
-        .demo-badge {
-            display: inline-block;
-            background: #ffd700;
-            color: #1a1a1a;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            margin-left: 8px;
-        }
+{% extends "base.html" %}
 
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1.5rem;
-            margin-top: 2rem;
-        }
+{% block title %}Dashboard - Forecast.vk{% endblock %}
 
-        .card {
-            background-color: var(--primary-light);
-            border-radius: 10px;
-            padding: 1.5rem;
-            box-shadow: var(--shadow);
-            transition: var(--transition);
-        }
+{% block content %}
+<section class="page-header">
+    <h2>Dashboard</h2>
+    <p>Welcome back! Here's an overview of your business performance and recent activities.</p>
+</section>
 
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .card-header h3 {
-            color: var(--secondary-color);
-            margin: 0;
-            font-size: 1.2rem;
-        }
-
-        .view-all {
-            color: var(--accent-color);
-            text-decoration: none;
-            font-size: 0.9rem;
-            transition: var(--transition);
-        }
-
-        .view-all:hover {
-            color: var(--secondary-color);
-        }
-
-        .card-content {
-            color: var(--text-color);
-        }
-
-        .no-data {
-            text-align: center;
-            color: var(--text-color);
-            opacity: 0.7;
-            font-style: italic;
-            padding: 2rem;
-        }
-
-        .status-badge {
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-
-        .status-badge.critical {
-            background-color: rgba(244, 67, 54, 0.2);
-            color: #f44336;
-            border: 1px solid rgba(244, 67, 54, 0.3);
-        }
-
-        .status-badge.warning {
-            background-color: rgba(255, 152, 0, 0.2);
-            color: #ff9800;
-            border: 1px solid rgba(255, 152, 0, 0.3);
-        }
-
-        .quick-actions {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 1rem;
-        }
-
-        .quick-action-btn {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 1rem;
-            background-color: var(--primary-dark);
-            border-radius: 8px;
-            text-decoration: none;
-            color: var(--text-color);
-            transition: var(--transition);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .quick-action-btn:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-            transform: translateY(-2px);
-            color: var(--secondary-color);
-        }
-
-        .quick-action-icon {
-            font-size: 1.5rem;
-            margin-bottom: 0.5rem;
-        }
-
-        @media (max-width: 768px) {
-            .dashboard-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .quick-actions {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-    </style>
-</head>
-<body>
-    {% if current_user.email == 'Recruiter@gmail.com' %}
-    <div class="demo-banner">
-        <div class="demo-banner-content">
-            <h3>🎯 Demo Environment <span class="demo-badge">FOR RECRUITERS</span></h3>
-            <p>You're viewing sample data for evaluation purposes</p>
-        </div>
+<!-- Business Summary Cards -->
+<div class="summary-cards">
+    <div class="summary-card">
+        <h4>Total Products</h4>
+        <span class="amount">{{ total_products }}</span>
+        <span class="trend">Active inventory items</span>
     </div>
+    <div class="summary-card">
+        <h4>Total Sales</h4>
+        <span class="amount">₹{{ "%.2f"|format(total_sales) }}</span>
+        <span class="trend">Revenue generated</span>
+    </div>
+    <div class="summary-card">
+        <h4>Total Purchases</h4>
+        <span class="amount">₹{{ "%.2f"|format(total_purchases) }}</span>
+        <span class="trend">Investment made</span>
+    </div>
+    <div class="summary-card">
+        <h4>Total Customers</h4>
+        <span class="amount">{{ total_customers }}</span>
+        <span class="trend">Active customers</span>
+    </div>
+</div>
+
+<!-- Recent Sales -->
+<div class="table-container">
+    <h3>Recent Sales</h3>
+    {% if recent_sales %}
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Customer</th>
+                <th>Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sale in recent_sales %}
+            <tr>
+                <td>{{ sale.date.strftime('%Y-%m-%d') if sale.date else 'N/A' }}</td>
+                <td>{{ sale.customer_name or 'Unknown' }}</td>
+                <td>₹{{ "%.2f"|format(sale.total_amount) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="text-align: center; color: var(--text-color); opacity: 0.7; padding: 2rem;">
+        No recent sales found. <a href="{{ url_for('sales') }}" style="color: var(--accent-color);">Add your first sale</a>
+    </p>
     {% endif %}
+</div>
 
-    <div class="container">
-        <header class="header">
-            <div class="logo">
-                <div class="logo-box">
-                    <span class="logo-text">F.vk</span>
-                </div>
-                <h1>Forecast.vk</h1>
-            </div>
-            <nav>
-                <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </button>
-                <ul>
-                    <li><a href="{{ url_for('home') }}" class="active">Dashboard</a></li>
-                    <li><a href="{{ url_for('stock') }}">Stock</a></li>
-                    <li><a href="{{ url_for('sales') }}">Sales</a></li>
-                    <li><a href="{{ url_for('purchases') }}">Purchases</a></li>
-                    <li><a href="{{ url_for('customers') }}">Customers</a></li>
-                    <li><a href="{{ url_for('vendors') }}">Vendors</a></li>
-                    <li><a href="{{ url_for('insights') }}">Insights</a></li>
-                    <li><a href="{{ url_for('forecast_reports') }}">Forecast</a></li>
-                    <li><a href="{{ url_for('notifications') }}">Notifications</a></li>
-                    {% if session.get('is_admin') %}
-                    <li><a href="{{ url_for('admin') }}">Admin</a></li>
+<!-- Low Stock Alert -->
+<div class="table-container">
+    <h3>Low Stock Alert</h3>
+    {% if low_stock_items %}
+    <table>
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Current Stock</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in low_stock_items %}
+            <tr>
+                <td>{{ item.product_name }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>
+                    {% if item.quantity <= 5 %}
+                        <span style="color: #f44336; font-weight: 600;">Critical</span>
+                    {% elif item.quantity <= 10 %}
+                        <span style="color: #ff9800; font-weight: 600;">Low</span>
+                    {% else %}
+                        <span style="color: #4caf50; font-weight: 600;">Good</span>
                     {% endif %}
-                    <li><a href="{{ url_for('logout') }}">Logout</a></li>
-                </ul>
-            </nav>
-        </header>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="text-align: center; color: var(--text-color); opacity: 0.7; padding: 2rem;">
+        All items are well stocked! 📦
+    </p>
+    {% endif %}
+</div>
 
-        <main class="main-content">
-            <div class="page-header">
-                <h2>Welcome back, {{ current_user.name }}!</h2>
-                <p>Here's an overview of your business performance and recent activities.</p>
-            </div>
+<!-- Recent Purchases -->
+<div class="table-container">
+    <h3>Recent Purchases</h3>
+    {% if recent_purchases %}
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Vendor</th>
+                <th>Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for purchase in recent_purchases %}
+            <tr>
+                <td>{{ purchase.date.strftime('%Y-%m-%d') if purchase.date else 'N/A' }}</td>
+                <td>{{ purchase.vendor_name or 'Unknown' }}</td>
+                <td>₹{{ "%.2f"|format(purchase.total_amount) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="text-align: center; color: var(--text-color); opacity: 0.7; padding: 2rem;">
+        No recent purchases found. <a href="{{ url_for('purchases') }}" style="color: var(--accent-color);">Add your first purchase</a>
+    </p>
+    {% endif %}
+</div>
 
-            <div class="summary-cards">
-                <div class="summary-card">
-                    <h4>Total Products</h4>
-                    <span class="amount">{{ total_products }}</span>
-                    <span class="trend">Active inventory items</span>
-                </div>
-                <div class="summary-card">
-                    <h4>Total Sales</h4>
-                    <span class="amount">₹{{ "%.2f"|format(total_sales) }}</span>
-                    <span class="trend up">Revenue generated</span>
-                </div>
-                <div class="summary-card">
-                    <h4>Total Purchases</h4>
-                    <span class="amount">₹{{ "%.2f"|format(total_purchases) }}</span>
-                    <span class="trend">Investment made</span>
-                </div>
-                <div class="summary-card">
-                    <h4>Total Customers</h4>
-                    <span class="amount">{{ total_customers }}</span>
-                    <span class="trend">Active customers</span>
-                </div>
-            </div>
-
-            <div class="dashboard-grid">
-                <div class="card">
-                    <div class="card-header">
-                        <h3>Recent Sales</h3>
-                        <a href="{{ url_for('sales') }}" class="view-all">View All</a>
-                    </div>
-                    <div class="card-content">
-                        {% if recent_sales %}
-                            <div class="table-container">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Date</th>
-                                            <th>Customer</th>
-                                            <th>Amount</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for sale in recent_sales %}
-                                        <tr>
-                                            <td>{{ sale.date.strftime('%Y-%m-%d') if sale.date else 'N/A' }}</td>
-                                            <td>{{ sale.customer_name or 'Unknown' }}</td>
-                                            <td>₹{{ "%.2f"|format(sale.total_amount) }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% else %}
-                            <p class="no-data">No recent sales found. <a href="{{ url_for('sales') }}">Add your first sale</a></p>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <h3>Low Stock Items</h3>
-                        <a href="{{ url_for('stock') }}" class="view-all">View All</a>
-                    </div>
-                    <div class="card-content">
-                        {% if low_stock_items %}
-                            <div class="table-container">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Product</th>
-                                            <th>Current Stock</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for item in low_stock_items %}
-                                        <tr>
-                                            <td>{{ item.product_name }}</td>
-                                            <td>{{ item.quantity }}</td>
-                                            <td>
-                                                {% if item.quantity <= 5 %}
-                                                    <span class="status-badge critical">Critical</span>
-                                                {% elif item.quantity <= 10 %}
-                                                    <span class="status-badge warning">Low</span>
-                                                {% else %}
-                                                    <span class="status-badge warning">Monitor</span>
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% else %}
-                            <p class="no-data">All items are well stocked! 📦</p>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <h3>Recent Purchases</h3>
-                        <a href="{{ url_for('purchases') }}" class="view-all">View All</a>
-                    </div>
-                    <div class="card-content">
-                        {% if recent_purchases %}
-                            <div class="table-container">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Date</th>
-                                            <th>Vendor</th>
-                                            <th>Amount</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for purchase in recent_purchases %}
-                                        <tr>
-                                            <td>{{ purchase.date.strftime('%Y-%m-%d') if purchase.date else 'N/A' }}</td>
-                                            <td>{{ purchase.vendor_name or 'Unknown' }}</td>
-                                            <td>₹{{ "%.2f"|format(purchase.total_amount) }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% else %}
-                            <p class="no-data">No recent purchases found. <a href="{{ url_for('purchases') }}">Add your first purchase</a></p>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <h3>Quick Actions</h3>
-                    </div>
-                    <div class="card-content">
-                        <div class="quick-actions">
-                            <a href="{{ url_for('sales') }}" class="quick-action-btn">
-                                <span class="quick-action-icon">💰</span>
-                                <span>Add Sale</span>
-                            </a>
-                            <a href="{{ url_for('purchases') }}" class="quick-action-btn">
-                                <span class="quick-action-icon">🛒</span>
-                                <span>Add Purchase</span>
-                            </a>
-                            <a href="{{ url_for('stock') }}" class="quick-action-btn">
-                                <span class="quick-action-icon">📦</span>
-                                <span>Update Stock</span>
-                            </a>
-                            <a href="{{ url_for('insights') }}" class="quick-action-btn">
-                                <span class="quick-action-icon">📊</span>
-                                <span>View Reports</span>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
+<!-- Quick Actions -->
+<div class="row">
+    <div class="feature-card">
+        <h3>💰 Sales Management</h3>
+        <p>Add new sales, view sales history, and track revenue performance.</p>
+        <a href="{{ url_for('sales') }}" class="btn" style="margin-top: 1rem;">Manage Sales</a>
     </div>
+    <div class="feature-card">
+        <h3>🛒 Purchase Management</h3>
+        <p>Record purchases, manage vendors, and track expenses.</p>
+        <a href="{{ url_for('purchases') }}" class="btn" style="margin-top: 1rem;">Manage Purchases</a>
+    </div>
+    <div class="feature-card">
+        <h3>📦 Stock Control</h3>
+        <p>Monitor inventory levels, update stock, and manage products.</p>
+        <a href="{{ url_for('stock') }}" class="btn" style="margin-top: 1rem;">Manage Stock</a>
+    </div>
+</div>
 
-    <script>
-    // Add some interactivity to the dashboard
-    document.addEventListener('DOMContentLoaded', function() {
-        // Add hover effects to summary cards
-        const summaryCards = document.querySelectorAll('.summary-card');
-        summaryCards.forEach(card => {
-            card.addEventListener('mouseenter', function() {
-                this.style.transform = 'translateY(-5px)';
-            });
-            card.addEventListener('mouseleave', function() {
-                this.style.transform = 'translateY(0)';
-            });
-        });
-
-        // Add click tracking for quick actions
-        const quickActions = document.querySelectorAll('.quick-action-btn');
-        quickActions.forEach(action => {
-            action.addEventListener('click', function() {
-                console.log('Quick action clicked:', this.textContent.trim());
-            });
-        });
-    });
-    </script>
-</body>
-</html>
+<div class="row">
+    <div class="feature-card">
+        <h3>👥 Customer Management</h3>
+        <p>Add customers, view purchase history, and manage relationships.</p>
+        <a href="{{ url_for('customers') }}" class="btn" style="margin-top: 1rem;">Manage Customers</a>
+    </div>
+    <div class="feature-card">
+        <h3>📊 Business Insights</h3>
+        <p>View detailed reports, analytics, and business forecasts.</p>
+        <a href="{{ url_for('insights') }}" class="btn" style="margin-top: 1rem;">View Insights</a>
+    </div>
+    <div class="feature-card">
+        <h3>📥 Data Import</h3>
+        <p>Import sales, purchases, and product data from CSV files.</p>
+        <a href="{{ url_for('import_data') }}" class="btn" style="margin-top: 1rem;">Import Data</a>
+    </div>
+</div>
+{% endblock %}
