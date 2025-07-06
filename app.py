@@ -284,7 +284,71 @@ def logout():
 @login_required
 @regular_user_required
 def home():
-    return render_template('index.html')
+    try:
+        # Calculate dashboard statistics
+        total_products = Product.query.filter_by(user_id=current_user.id).count()
+        total_customers = Customer.query.filter_by(user_id=current_user.id).count()
+        
+        # Calculate total sales
+        sales = Sale.query.filter_by(user_id=current_user.id).all()
+        total_sales = sum(sale.total_amount for sale in sales if sale.total_amount)
+        
+        # Calculate total purchases
+        purchases = Purchase.query.filter_by(user_id=current_user.id).all()
+        total_purchases = sum(purchase.total_amount for purchase in purchases if purchase.total_amount)
+        
+        # Get recent sales (last 5)
+        recent_sales_query = Sale.query.filter_by(user_id=current_user.id).order_by(Sale.sale_date.desc()).limit(5).all()
+        recent_sales = []
+        for sale in recent_sales_query:
+            recent_sales.append({
+                'date': sale.sale_date,
+                'customer_name': sale.customer.name if sale.customer else 'Unknown',
+                'total_amount': sale.total_amount or 0
+            })
+        
+        # Get recent purchases (last 5)
+        recent_purchases_query = Purchase.query.filter_by(user_id=current_user.id).order_by(Purchase.purchase_date.desc()).limit(5).all()
+        recent_purchases = []
+        for purchase in recent_purchases_query:
+            recent_purchases.append({
+                'date': purchase.purchase_date,
+                'vendor_name': purchase.vendor.name if purchase.vendor else 'Unknown',
+                'total_amount': purchase.total_amount or 0
+            })
+        
+        # Get low stock items (quantity <= 20)
+        low_stock_items_query = Product.query.filter(
+            Product.user_id == current_user.id,
+            Product.quantity <= 20
+        ).order_by(Product.quantity.asc()).limit(10).all()
+        
+        low_stock_items = []
+        for item in low_stock_items_query:
+            low_stock_items.append({
+                'product_name': item.name,
+                'quantity': item.quantity
+            })
+        
+        return render_template('index.html',
+                             total_products=total_products,
+                             total_sales=total_sales,
+                             total_purchases=total_purchases,
+                             total_customers=total_customers,
+                             recent_sales=recent_sales,
+                             recent_purchases=recent_purchases,
+                             low_stock_items=low_stock_items)
+    except Exception as e:
+        logger.error(f"Error in home route: {str(e)}")
+        flash('Error loading dashboard data. Please try again.', 'error')
+        return render_template('index.html',
+                             total_products=0,
+                             total_sales=0,
+                             total_purchases=0,
+                             total_customers=0,
+                             recent_sales=[],
+                             recent_purchases=[],
+                             low_stock_items=[])
 
 # Function to generate daily report
 def generate_daily_report():
