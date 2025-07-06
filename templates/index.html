@@ -19,6 +19,7 @@
             border-bottom: 2px solid #ffd700;
             position: relative;
             overflow: hidden;
+            margin-bottom: 1rem;
         }
         
         .demo-banner::before {
@@ -64,10 +65,127 @@
             font-weight: 600;
             margin-left: 8px;
         }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .card {
+            background-color: var(--primary-light);
+            border-radius: 10px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .card-header h3 {
+            color: var(--secondary-color);
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        .view-all {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: var(--transition);
+        }
+
+        .view-all:hover {
+            color: var(--secondary-color);
+        }
+
+        .card-content {
+            color: var(--text-color);
+        }
+
+        .no-data {
+            text-align: center;
+            color: var(--text-color);
+            opacity: 0.7;
+            font-style: italic;
+            padding: 2rem;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-badge.critical {
+            background-color: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+            border: 1px solid rgba(244, 67, 54, 0.3);
+        }
+
+        .status-badge.warning {
+            background-color: rgba(255, 152, 0, 0.2);
+            color: #ff9800;
+            border: 1px solid rgba(255, 152, 0, 0.3);
+        }
+
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+        }
+
+        .quick-action-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1rem;
+            background-color: var(--primary-dark);
+            border-radius: 8px;
+            text-decoration: none;
+            color: var(--text-color);
+            transition: var(--transition);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .quick-action-btn:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+            color: var(--secondary-color);
+        }
+
+        .quick-action-icon {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .quick-actions {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
     </style>
 </head>
 <body>
-    {% if session.get('user_email') == 'Recruiter@gmail.com' %}
+    {% if current_user.email == 'Recruiter@gmail.com' %}
     <div class="demo-banner">
         <div class="demo-banner-content">
             <h3>🎯 Demo Environment <span class="demo-badge">FOR RECRUITERS</span></h3>
@@ -110,38 +228,30 @@
 
         <main class="main-content">
             <div class="page-header">
-                <h2>Dashboard</h2>
-                <p>Welcome back! Here's an overview of your business performance.</p>
+                <h2>Welcome back, {{ current_user.name }}!</h2>
+                <p>Here's an overview of your business performance and recent activities.</p>
             </div>
 
             <div class="summary-cards">
                 <div class="summary-card">
-                    <div class="summary-icon">📦</div>
-                    <div class="summary-content">
-                        <h3>Total Products</h3>
-                        <p class="summary-number">{{ total_products }}</p>
-                    </div>
+                    <h4>Total Products</h4>
+                    <span class="amount">{{ total_products }}</span>
+                    <span class="trend">Active inventory items</span>
                 </div>
                 <div class="summary-card">
-                    <div class="summary-icon">💰</div>
-                    <div class="summary-content">
-                        <h3>Total Sales</h3>
-                        <p class="summary-number">₹{{ "%.2f"|format(total_sales) }}</p>
-                    </div>
+                    <h4>Total Sales</h4>
+                    <span class="amount">₹{{ "%.2f"|format(total_sales) }}</span>
+                    <span class="trend up">Revenue generated</span>
                 </div>
                 <div class="summary-card">
-                    <div class="summary-icon">🛒</div>
-                    <div class="summary-content">
-                        <h3>Total Purchases</h3>
-                        <p class="summary-number">₹{{ "%.2f"|format(total_purchases) }}</p>
-                    </div>
+                    <h4>Total Purchases</h4>
+                    <span class="amount">₹{{ "%.2f"|format(total_purchases) }}</span>
+                    <span class="trend">Investment made</span>
                 </div>
                 <div class="summary-card">
-                    <div class="summary-icon">👥</div>
-                    <div class="summary-content">
-                        <h3>Total Customers</h3>
-                        <p class="summary-number">{{ total_customers }}</p>
-                    </div>
+                    <h4>Total Customers</h4>
+                    <span class="amount">{{ total_customers }}</span>
+                    <span class="trend">Active customers</span>
                 </div>
             </div>
 
@@ -174,7 +284,7 @@
                                 </table>
                             </div>
                         {% else %}
-                            <p class="no-data">No recent sales found.</p>
+                            <p class="no-data">No recent sales found. <a href="{{ url_for('sales') }}">Add your first sale</a></p>
                         {% endif %}
                     </div>
                 </div>
@@ -201,10 +311,12 @@
                                             <td>{{ item.product_name }}</td>
                                             <td>{{ item.quantity }}</td>
                                             <td>
-                                                {% if item.quantity <= 10 %}
+                                                {% if item.quantity <= 5 %}
                                                     <span class="status-badge critical">Critical</span>
-                                                {% elif item.quantity <= 20 %}
+                                                {% elif item.quantity <= 10 %}
                                                     <span class="status-badge warning">Low</span>
+                                                {% else %}
+                                                    <span class="status-badge warning">Monitor</span>
                                                 {% endif %}
                                             </td>
                                         </tr>
@@ -213,7 +325,7 @@
                                 </table>
                             </div>
                         {% else %}
-                            <p class="no-data">All items are well stocked.</p>
+                            <p class="no-data">All items are well stocked! 📦</p>
                         {% endif %}
                     </div>
                 </div>
@@ -246,7 +358,7 @@
                                 </table>
                             </div>
                         {% else %}
-                            <p class="no-data">No recent purchases found.</p>
+                            <p class="no-data">No recent purchases found. <a href="{{ url_for('purchases') }}">Add your first purchase</a></p>
                         {% endif %}
                     </div>
                 </div>
@@ -280,6 +392,28 @@
         </main>
     </div>
 
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+    // Add some interactivity to the dashboard
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add hover effects to summary cards
+        const summaryCards = document.querySelectorAll('.summary-card');
+        summaryCards.forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-5px)';
+            });
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0)';
+            });
+        });
+
+        // Add click tracking for quick actions
+        const quickActions = document.querySelectorAll('.quick-action-btn');
+        quickActions.forEach(action => {
+            action.addEventListener('click', function() {
+                console.log('Quick action clicked:', this.textContent.trim());
+            });
+        });
+    });
+    </script>
 </body>
 </html>
