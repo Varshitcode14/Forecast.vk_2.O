@@ -10,8 +10,72 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .demo-banner {
+            background: linear-gradient(135deg, #1a1a1a 0%, #333 100%);
+            color: white;
+            padding: 12px 20px;
+            text-align: center;
+            border-bottom: 2px solid #ffd700;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .demo-banner::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.1), transparent);
+            animation: shimmer 3s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+        
+        .demo-banner-content {
+            position: relative;
+            z-index: 1;
+        }
+        
+        .demo-banner h3 {
+            margin: 0 0 5px 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        
+        .demo-banner p {
+            margin: 0;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .demo-badge {
+            display: inline-block;
+            background: #ffd700;
+            color: #1a1a1a;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+    </style>
 </head>
 <body>
+    {% if session.get('user_email') == 'Recruiter@gmail.com' %}
+    <div class="demo-banner">
+        <div class="demo-banner-content">
+            <h3>🎯 Demo Environment <span class="demo-badge">FOR RECRUITERS</span></h3>
+            <p>You're viewing sample data for evaluation purposes</p>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="container">
         <header class="header">
             <div class="logo">
@@ -20,107 +84,195 @@
                 </div>
                 <h1>Forecast.vk</h1>
             </div>
-            <div class="user-info">
-                <span>Welcome, {{ current_user.email }}</span>
-                <a href="{{ url_for('logout') }}" class="btn btn-secondary">Logout</a>
-            </div>
+            <nav>
+                <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <ul>
+                    <li><a href="{{ url_for('home') }}" class="active">Dashboard</a></li>
+                    <li><a href="{{ url_for('stock') }}">Stock</a></li>
+                    <li><a href="{{ url_for('sales') }}">Sales</a></li>
+                    <li><a href="{{ url_for('purchases') }}">Purchases</a></li>
+                    <li><a href="{{ url_for('customers') }}">Customers</a></li>
+                    <li><a href="{{ url_for('vendors') }}">Vendors</a></li>
+                    <li><a href="{{ url_for('insights') }}">Insights</a></li>
+                    <li><a href="{{ url_for('forecast_reports') }}">Forecast</a></li>
+                    <li><a href="{{ url_for('notifications') }}">Notifications</a></li>
+                    {% if session.get('is_admin') %}
+                    <li><a href="{{ url_for('admin') }}">Admin</a></li>
+                    {% endif %}
+                    <li><a href="{{ url_for('logout') }}">Logout</a></li>
+                </ul>
+            </nav>
         </header>
-
-        <nav class="sidebar">
-            <ul>
-                <li><a href="{{ url_for('home') }}" class="active">Dashboard</a></li>
-                <li><a href="{{ url_for('sales') }}">Sales</a></li>
-                <li><a href="{{ url_for('purchases') }}">Purchases</a></li>
-                <li><a href="{{ url_for('stock') }}">Stock</a></li>
-                <li><a href="{{ url_for('customers') }}">Customers</a></li>
-                <li><a href="{{ url_for('vendors') }}">Vendors</a></li>
-                <li><a href="{{ url_for('insights') }}">Insights</a></li>
-                <li><a href="{{ url_for('forecast_reports') }}">Forecast Reports</a></li>
-                <li><a href="{{ url_for('import_data') }}">Import Data</a></li>
-                {% if current_user.is_admin %}
-                <li><a href="{{ url_for('admin') }}">Admin</a></li>
-                {% endif %}
-            </ul>
-        </nav>
 
         <main class="main-content">
             <div class="page-header">
                 <h2>Dashboard</h2>
-                <p>Overview of your business performance</p>
+                <p>Welcome back! Here's an overview of your business performance.</p>
             </div>
 
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon">💰</div>
-                    <div class="stat-content">
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <div class="summary-icon">📦</div>
+                    <div class="summary-content">
+                        <h3>Total Products</h3>
+                        <p class="summary-number">{{ total_products }}</p>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-icon">💰</div>
+                    <div class="summary-content">
                         <h3>Total Sales</h3>
-                        <p class="stat-value" id="totalSales">₹0</p>
-                        <span class="stat-change positive">+12.5%</span>
+                        <p class="summary-number">₹{{ "%.2f"|format(total_sales) }}</p>
                     </div>
                 </div>
-                
-                <div class="stat-card">
-                    <div class="stat-icon">🛒</div>
-                    <div class="stat-content">
+                <div class="summary-card">
+                    <div class="summary-icon">🛒</div>
+                    <div class="summary-content">
                         <h3>Total Purchases</h3>
-                        <p class="stat-value" id="totalPurchases">₹0</p>
-                        <span class="stat-change negative">-3.2%</span>
+                        <p class="summary-number">₹{{ "%.2f"|format(total_purchases) }}</p>
                     </div>
                 </div>
-                
-                <div class="stat-card">
-                    <div class="stat-icon">📦</div>
-                    <div class="stat-content">
-                        <h3>Stock Items</h3>
-                        <p class="stat-value" id="stockItems">0</p>
-                        <span class="stat-change positive">+5.8%</span>
-                    </div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-icon">👥</div>
-                    <div class="stat-content">
-                        <h3>Active Customers</h3>
-                        <p class="stat-value" id="activeCustomers">0</p>
-                        <span class="stat-change positive">+8.1%</span>
+                <div class="summary-card">
+                    <div class="summary-icon">👥</div>
+                    <div class="summary-content">
+                        <h3>Total Customers</h3>
+                        <p class="summary-number">{{ total_customers }}</p>
                     </div>
                 </div>
             </div>
 
-            <div class="charts-grid">
-                <div class="chart-container">
-                    <h3>Sales vs Purchases</h3>
-                    <canvas id="salesPurchasesChart"></canvas>
+            <div class="dashboard-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Recent Sales</h3>
+                        <a href="{{ url_for('sales') }}" class="view-all">View All</a>
+                    </div>
+                    <div class="card-content">
+                        {% if recent_sales %}
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Customer</th>
+                                            <th>Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for sale in recent_sales %}
+                                        <tr>
+                                            <td>{{ sale.date.strftime('%Y-%m-%d') if sale.date else 'N/A' }}</td>
+                                            <td>{{ sale.customer_name or 'Unknown' }}</td>
+                                            <td>₹{{ "%.2f"|format(sale.total_amount) }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="no-data">No recent sales found.</p>
+                        {% endif %}
+                    </div>
                 </div>
-                
-                <div class="chart-container">
-                    <h3>Monthly Revenue Trend</h3>
-                    <canvas id="revenueChart"></canvas>
-                </div>
-            </div>
 
-            <div class="recent-activity">
-                <h3>Recent Activity</h3>
-                <div class="activity-list" id="recentActivity">
-                    <div class="activity-item">
-                        <div class="activity-icon">📊</div>
-                        <div class="activity-content">
-                            <p><strong>Sales Report Generated</strong></p>
-                            <span class="activity-time">2 hours ago</span>
-                        </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Low Stock Items</h3>
+                        <a href="{{ url_for('stock') }}" class="view-all">View All</a>
                     </div>
-                    <div class="activity-item">
-                        <div class="activity-icon">📦</div>
-                        <div class="activity-content">
-                            <p><strong>Stock Updated</strong></p>
-                            <span class="activity-time">4 hours ago</span>
-                        </div>
+                    <div class="card-content">
+                        {% if low_stock_items %}
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Product</th>
+                                            <th>Current Stock</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in low_stock_items %}
+                                        <tr>
+                                            <td>{{ item.product_name }}</td>
+                                            <td>{{ item.quantity }}</td>
+                                            <td>
+                                                {% if item.quantity <= 10 %}
+                                                    <span class="status-badge critical">Critical</span>
+                                                {% elif item.quantity <= 20 %}
+                                                    <span class="status-badge warning">Low</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="no-data">All items are well stocked.</p>
+                        {% endif %}
                     </div>
-                    <div class="activity-item">
-                        <div class="activity-icon">👤</div>
-                        <div class="activity-content">
-                            <p><strong>New Customer Added</strong></p>
-                            <span class="activity-time">6 hours ago</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Recent Purchases</h3>
+                        <a href="{{ url_for('purchases') }}" class="view-all">View All</a>
+                    </div>
+                    <div class="card-content">
+                        {% if recent_purchases %}
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Vendor</th>
+                                            <th>Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for purchase in recent_purchases %}
+                                        <tr>
+                                            <td>{{ purchase.date.strftime('%Y-%m-%d') if purchase.date else 'N/A' }}</td>
+                                            <td>{{ purchase.vendor_name or 'Unknown' }}</td>
+                                            <td>₹{{ "%.2f"|format(purchase.total_amount) }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="no-data">No recent purchases found.</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Quick Actions</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="quick-actions">
+                            <a href="{{ url_for('sales') }}" class="quick-action-btn">
+                                <span class="quick-action-icon">💰</span>
+                                <span>Add Sale</span>
+                            </a>
+                            <a href="{{ url_for('purchases') }}" class="quick-action-btn">
+                                <span class="quick-action-icon">🛒</span>
+                                <span>Add Purchase</span>
+                            </a>
+                            <a href="{{ url_for('stock') }}" class="quick-action-btn">
+                                <span class="quick-action-icon">📦</span>
+                                <span>Update Stock</span>
+                            </a>
+                            <a href="{{ url_for('insights') }}" class="quick-action-btn">
+                                <span class="quick-action-icon">📊</span>
+                                <span>View Reports</span>
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -129,92 +281,5 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
-    <script>
-        // Initialize dashboard
-        document.addEventListener('DOMContentLoaded', function() {
-            loadDashboardData();
-            initializeCharts();
-        });
-
-        function loadDashboardData() {
-            fetch('/api/dashboard-stats')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('totalSales').textContent = '₹' + formatNumber(data.total_sales || 0);
-                    document.getElementById('totalPurchases').textContent = '₹' + formatNumber(data.total_purchases || 0);
-                    document.getElementById('stockItems').textContent = data.stock_items || 0;
-                    document.getElementById('activeCustomers').textContent = data.active_customers || 0;
-                })
-                .catch(error => {
-                    console.error('Error loading dashboard data:', error);
-                    // Set default values if API fails
-                    document.getElementById('totalSales').textContent = '₹1,25,000';
-                    document.getElementById('totalPurchases').textContent = '₹85,000';
-                    document.getElementById('stockItems').textContent = '156';
-                    document.getElementById('activeCustomers').textContent = '42';
-                });
-        }
-
-        function initializeCharts() {
-            // Sales vs Purchases Chart
-            const salesPurchasesCtx = document.getElementById('salesPurchasesChart').getContext('2d');
-            new Chart(salesPurchasesCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-                    datasets: [{
-                        label: 'Sales',
-                        data: [12000, 19000, 15000, 25000, 22000, 30000],
-                        backgroundColor: 'rgba(54, 162, 235, 0.8)',
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        borderWidth: 1
-                    }, {
-                        label: 'Purchases',
-                        data: [8000, 12000, 10000, 18000, 15000, 20000],
-                        backgroundColor: 'rgba(255, 99, 132, 0.8)',
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-
-            // Revenue Trend Chart
-            const revenueCtx = document.getElementById('revenueChart').getContext('2d');
-            new Chart(revenueCtx, {
-                type: 'line',
-                data: {
-                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-                    datasets: [{
-                        label: 'Revenue',
-                        data: [4000, 7000, 5000, 7000, 7000, 10000],
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                        borderWidth: 2,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-        }
-
-        function formatNumber(num) {
-            return new Intl.NumberFormat('en-IN').format(num);
-        }
-    </script>
 </body>
 </html>
