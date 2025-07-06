@@ -102,36 +102,37 @@
   top: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(5px);
+  background-color: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
 }
 
 .demo-modal-content {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  margin: 5% auto;
+  background: #ffffff;
+  margin: 8% auto;
   padding: 0;
-  border-radius: 15px;
+  border-radius: 12px;
   width: 90%;
-  max-width: 600px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-  animation: modalSlideIn 0.3s ease-out;
-  color: white;
+  max-width: 480px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+  animation: modalSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #1a1a1a;
+  border: 1px solid #e5e5e5;
 }
 
 @keyframes modalSlideIn {
   from {
     opacity: 0;
-    transform: translateY(-50px);
+    transform: translateY(-30px) scale(0.95);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
 .demo-modal-header {
-  padding: 25px 30px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 24px 28px 16px;
+  border-bottom: 1px solid #f0f0f0;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -139,129 +140,145 @@
 
 .demo-modal-header h2 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   font-weight: 600;
+  color: #1a1a1a;
+  font-family: 'Poppins', sans-serif;
 }
 
 .demo-close {
-  font-size: 28px;
-  font-weight: bold;
+  font-size: 24px;
+  font-weight: 300;
   cursor: pointer;
-  opacity: 0.7;
-  transition: opacity 0.3s;
+  color: #666;
+  transition: color 0.2s;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
 }
 
 .demo-close:hover {
-  opacity: 1;
+  color: #1a1a1a;
+  background: #f5f5f5;
 }
 
 .demo-modal-body {
-  padding: 25px 30px;
+  padding: 20px 28px 24px;
 }
 
-.demo-info p {
-  margin-bottom: 15px;
-  line-height: 1.6;
+.demo-intro {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.demo-intro p {
+  margin: 0 0 16px 0;
+  color: #4a4a4a;
+  font-size: 0.95rem;
+  line-height: 1.5;
 }
 
 .demo-credentials {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 20px;
-  border-radius: 10px;
-  margin: 20px 0;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #f8f9fa;
+  padding: 18px;
+  border-radius: 8px;
+  margin: 16px 0;
+  border: 1px solid #e9ecef;
 }
 
 .demo-credentials h3 {
-  margin: 0 0 15px 0;
-  color: #ffd700;
+  margin: 0 0 12px 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a1a1a;
 }
 
-.credential-box {
-  background: rgba(0, 0, 0, 0.2);
-  padding: 15px;
-  border-radius: 8px;
-  font-family: 'Courier New', monospace;
+.credential-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 8px 0;
+  font-family: 'Poppins', sans-serif;
 }
 
-.credential-text {
-  background: rgba(255, 255, 255, 0.2);
-  padding: 2px 8px;
+.credential-label {
+  font-weight: 500;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.credential-value {
+  background: #1a1a1a;
+  color: white;
+  padding: 4px 10px;
   border-radius: 4px;
-  font-weight: bold;
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  font-weight: 500;
 }
 
 .demo-features {
-  margin: 20px 0;
+  margin: 16px 0 0 0;
+  text-align: center;
 }
 
-.demo-features h3 {
-  margin: 0 0 15px 0;
-  color: #ffd700;
-}
-
-.demo-features ul {
-  list-style: none;
-  padding: 0;
-}
-
-.demo-features li {
-  padding: 5px 0;
-  font-size: 0.95rem;
-}
-
-.demo-note {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 15px;
-  border-radius: 8px;
-  border-left: 4px solid #ffd700;
-  margin-top: 20px;
+.demo-features p {
+  margin: 0;
+  color: #666;
+  font-size: 0.9rem;
 }
 
 .demo-modal-footer {
-  padding: 20px 30px 30px;
+  padding: 16px 28px 28px;
   display: flex;
-  gap: 15px;
+  gap: 12px;
   justify-content: center;
 }
 
 .demo-btn {
-  padding: 12px 25px;
+  padding: 12px 24px;
   border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.2s;
   text-decoration: none;
   display: inline-block;
+  font-family: 'Poppins', sans-serif;
 }
 
 .demo-btn-primary {
-  background: #ffd700;
-  color: #333;
+  background: #1a1a1a;
+  color: white;
 }
 
 .demo-btn-primary:hover {
-  background: #ffed4e;
-  transform: translateY(-2px);
+  background: #333;
+  transform: translateY(-1px);
 }
 
 .demo-btn-secondary {
   background: transparent;
-  color: white;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: #666;
+  border: 1px solid #ddd;
 }
 
 .demo-btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.5);
+  background: #f5f5f5;
+  border-color: #bbb;
+  color: #1a1a1a;
 }
 
 @media (max-width: 768px) {
   .demo-modal-content {
     width: 95%;
-    margin: 10% auto;
+    margin: 15% auto;
   }
   
   .demo-modal-header,
@@ -278,6 +295,12 @@
   .demo-btn {
     width: 100%;
   }
+  
+  .credential-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
 }
 </style>
 </head>
@@ -286,49 +309,42 @@
 <div id="demoModal" class="demo-modal">
   <div class="demo-modal-content">
     <div class="demo-modal-header">
-      <h2>🚀 Demo Access for Recruiters & Evaluators</h2>
-      <span class="demo-close">&times;</span>
+      <h2>🎯 Demo Access</h2>
+      <button class="demo-close">&times;</button>
     </div>
     <div class="demo-modal-body">
-      <div class="demo-info">
-        <p><strong>Welcome to Forecast.vk Demo!</strong></p>
-        <p>This business management platform includes pre-loaded sample data to showcase all features including sales tracking, inventory management, purchase orders, and business analytics.</p>
-        
-        <div class="demo-credentials">
-          <h3>🔑 Demo Login Credentials:</h3>
-          <div class="credential-box">
-            <p><strong>Email:</strong> <span class="credential-text">Recruiter@gmail.com</span></p>
-            <p><strong>Password:</strong> <span class="credential-text">Recruit@100%</span></p>
-          </div>
+      <div class="demo-intro">
+        <p><strong>For Recruiters & Evaluators</strong></p>
+        <p>Experience our business management platform with pre-loaded sample data.</p>
+      </div>
+      
+      <div class="demo-credentials">
+        <h3>Login Credentials</h3>
+        <div class="credential-item">
+          <span class="credential-label">Email:</span>
+          <span class="credential-value">Recruiter@gmail.com</span>
         </div>
-        
-        <div class="demo-features">
-          <h3>📊 What you'll see:</h3>
-          <ul>
-            <li>✅ Sample sales transactions and customer data</li>
-            <li>✅ Purchase orders and vendor management</li>
-            <li>✅ Real-time inventory tracking</li>
-            <li>✅ Business insights and analytics</li>
-            <li>✅ Data import/export functionality</li>
-            <li>✅ Demand forecasting algorithms</li>
-          </ul>
+        <div class="credential-item">
+          <span class="credential-label">Password:</span>
+          <span class="credential-value">Recruit@100%</span>
         </div>
-        
-        <div class="demo-note">
-          <p><em>Note: This is a demonstration environment with pre-uploaded sample data. All features are fully functional for evaluation purposes.</em></p>
-        </div>
+      </div>
+      
+      <div class="demo-features">
+        <p>Includes sales data, inventory tracking, analytics & forecasting</p>
       </div>
     </div>
     <div class="demo-modal-footer">
       <button class="demo-btn demo-btn-primary" onclick="window.location.href='/login'">
-        🚀 Try Demo Now
+        Try Demo
       </button>
       <button class="demo-btn demo-btn-secondary" onclick="closeDemoModal()">
-        Continue Browsing
+        Close
       </button>
     </div>
   </div>
 </div>
+
 <div class="landing-container">
   <header class="landing-header">
     <div class="container" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
@@ -387,6 +403,7 @@
     </div>
   </footer>
 </div>
+
 <script>
 // Demo Modal Functions
 function showDemoModal() {
@@ -401,7 +418,7 @@ function closeDemoModal() {
 // Show modal on page load (only if not shown before in this session)
 document.addEventListener('DOMContentLoaded', function() {
   if (!localStorage.getItem('demoModalShown')) {
-    setTimeout(showDemoModal, 1000); // Show after 1 second
+    setTimeout(showDemoModal, 1500); // Show after 1.5 seconds
   }
 });
 

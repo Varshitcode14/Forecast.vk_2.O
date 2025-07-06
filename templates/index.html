@@ -67,23 +67,37 @@
                 text-align: center;
             }
         }
+
+        .demo-banner {
+            background: linear-gradient(135deg, #1a1a1a 0%, #333 100%);
+            color: white;
+            padding: 12px 0;
+            text-align: center;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .demo-banner p {
+            margin: 0;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .demo-banner .demo-highlight {
+            color: #ffd700;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <!-- Demo Banner for Recruiters -->
+        {% if session.get('email') == 'Recruiter@gmail.com' %}
         <div class="demo-banner">
-            <div class="demo-banner-content">
-                <div class="demo-icon">🎯</div>
-                <div class="demo-text">
-                    <h3>Demo Environment Active</h3>
-                    <p>You're viewing pre-loaded sample data for evaluation purposes</p>
-                </div>
-            </div>
-            <button class="demo-info-btn" onclick="showDemoInfo()">
-                ℹ️ Demo Info
-            </button>
+            <p>🎯 <span class="demo-highlight">Demo Environment</span> - Pre-loaded with sample business data for evaluation</p>
         </div>
+        {% endif %}
 
         <header class="header">
             <div class="logo">
@@ -92,40 +106,39 @@
                 </div>
                 <h1>Forecast.vk</h1>
             </div>
-            <div class="user-info">
-                <span>Welcome, {{ session.get('user_name', 'User') }}!</span>
-                <a href="{{ url_for('logout') }}" class="btn btn-secondary">Logout</a>
-            </div>
+            <nav>
+                <ul>
+                    <li><a href="{{ url_for('index') }}" class="active">Dashboard</a></li>
+                    <li><a href="{{ url_for('sales') }}">Sales</a></li>
+                    <li><a href="{{ url_for('purchases') }}">Purchases</a></li>
+                    <li><a href="{{ url_for('stock') }}">Stock</a></li>
+                    <li><a href="{{ url_for('customers') }}">Customers</a></li>
+                    <li><a href="{{ url_for('vendors') }}">Vendors</a></li>
+                    <li><a href="{{ url_for('insights') }}">Insights</a></li>
+                    <li><a href="{{ url_for('forecast_reports') }}">Forecast</a></li>
+                    <li><a href="{{ url_for('notifications') }}">Notifications</a></li>
+                    {% if session.get('is_admin') %}
+                    <li><a href="{{ url_for('admin') }}">Admin</a></li>
+                    {% endif %}
+                    <li><a href="{{ url_for('logout') }}" class="logout-btn">Logout</a></li>
+                </ul>
+            </nav>
         </header>
-
-        <nav class="nav">
-            <a href="{{ url_for('index') }}" class="nav-link active">Dashboard</a>
-            <a href="{{ url_for('sales') }}" class="nav-link">Sales</a>
-            <a href="{{ url_for('purchases') }}" class="nav-link">Purchases</a>
-            <a href="{{ url_for('stock') }}" class="nav-link">Stock</a>
-            <a href="{{ url_for('customers') }}" class="nav-link">Customers</a>
-            <a href="{{ url_for('vendors') }}" class="nav-link">Vendors</a>
-            <a href="{{ url_for('insights') }}" class="nav-link">Insights</a>
-            <a href="{{ url_for('forecast_reports') }}" class="nav-link">Forecast Reports</a>
-            <a href="{{ url_for('notifications') }}" class="nav-link">Notifications</a>
-            {% if session.get('is_admin') %}
-            <a href="{{ url_for('admin') }}" class="nav-link">Admin</a>
-            {% endif %}
-        </nav>
 
         <main class="main">
             <div class="page-header">
                 <h2>Dashboard</h2>
-                <p>Overview of your business performance</p>
+                <p>Welcome to your business management dashboard. Get insights into your sales, inventory, and overall business performance.</p>
             </div>
 
+            <!-- Summary Cards -->
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-icon">💰</div>
                     <div class="stat-content">
                         <h3>Total Sales</h3>
-                        <p class="stat-value">₹{{ "{:,.2f}".format(total_sales) }}</p>
-                        <span class="stat-change positive">+12.5% from last month</span>
+                        <p class="stat-value">${{ "{:,.2f}".format(total_sales or 0) }}</p>
+                        <span class="stat-change positive">+12% this month</span>
                     </div>
                 </div>
 
@@ -133,8 +146,8 @@
                     <div class="stat-icon">🛒</div>
                     <div class="stat-content">
                         <h3>Total Purchases</h3>
-                        <p class="stat-value">₹{{ "{:,.2f}".format(total_purchases) }}</p>
-                        <span class="stat-change negative">-3.2% from last month</span>
+                        <p class="stat-value">${{ "{:,.2f}".format(total_purchases or 0) }}</p>
+                        <span class="stat-change positive">+8% this month</span>
                     </div>
                 </div>
 
@@ -142,8 +155,8 @@
                     <div class="stat-icon">📦</div>
                     <div class="stat-content">
                         <h3>Stock Items</h3>
-                        <p class="stat-value">{{ stock_count }}</p>
-                        <span class="stat-change positive">+5 new items</span>
+                        <p class="stat-value">{{ stock_count or 0 }}</p>
+                        <span class="stat-change positive">{{ low_stock_count or 0 }} low stock</span>
                     </div>
                 </div>
 
@@ -151,12 +164,13 @@
                     <div class="stat-icon">👥</div>
                     <div class="stat-content">
                         <h3>Active Customers</h3>
-                        <p class="stat-value">{{ customer_count }}</p>
-                        <span class="stat-change positive">+8 this month</span>
+                        <p class="stat-value">{{ customer_count or 0 }}</p>
+                        <span class="stat-change positive">+5 new this week</span>
                     </div>
                 </div>
             </div>
 
+            <!-- Recent Activity -->
             <div class="dashboard-grid">
                 <div class="dashboard-card">
                     <h3>Recent Sales</h3>
@@ -167,16 +181,14 @@
                                     <th>Date</th>
                                     <th>Customer</th>
                                     <th>Amount</th>
-                                    <th>Status</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for sale in recent_sales %}
+                                {% for sale in recent_sales[:5] %}
                                 <tr>
                                     <td>{{ sale.date.strftime('%Y-%m-%d') if sale.date else 'N/A' }}</td>
                                     <td>{{ sale.customer_name or 'Unknown' }}</td>
-                                    <td>₹{{ "{:,.2f}".format(sale.total_amount) }}</td>
-                                    <td><span class="status-badge status-completed">Completed</span></td>
+                                    <td>${{ "{:,.2f}".format(sale.total_amount or 0) }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -187,119 +199,71 @@
 
                 <div class="dashboard-card">
                     <h3>Low Stock Alerts</h3>
-                    <div class="alert-list">
-                        {% for item in low_stock_items %}
-                        <div class="alert-item">
-                            <div class="alert-icon">⚠️</div>
-                            <div class="alert-content">
-                                <h4>{{ item.product_name }}</h4>
-                                <p>Only {{ item.quantity }} units left</p>
-                            </div>
-                        </div>
-                        {% endfor %}
-                        {% if not low_stock_items %}
-                        <div class="alert-item">
-                            <div class="alert-icon">✅</div>
-                            <div class="alert-content">
-                                <h4>All Good!</h4>
-                                <p>No low stock alerts</p>
-                            </div>
-                        </div>
-                        {% endif %}
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Current Stock</th>
+                                    <th>Min Level</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in low_stock_items[:5] %}
+                                <tr>
+                                    <td>{{ item.product_name or 'Unknown' }}</td>
+                                    <td>{{ item.quantity or 0 }}</td>
+                                    <td>{{ item.min_stock_level or 0 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                     <a href="{{ url_for('stock') }}" class="btn btn-secondary">Manage Stock</a>
                 </div>
             </div>
 
+            <!-- Charts Placeholder -->
             <div class="dashboard-grid">
                 <div class="dashboard-card">
-                    <h3>Monthly Sales Trend</h3>
+                    <h3>Business Analytics</h3>
                     <div class="chart-placeholder">
-                        <p>📈 Sales have increased by 15% this month</p>
-                        <p>Peak sales day: {{ peak_sales_day or 'Monday' }}</p>
-                        <p>Average daily sales: ₹{{ "{:,.2f}".format(avg_daily_sales) }}</p>
+                        <p>Sales Trend Chart - Integration with Chart.js coming soon</p>
                     </div>
                 </div>
+            </div>
 
+            <!-- Quick Actions -->
+            <div class="dashboard-grid">
                 <div class="dashboard-card">
-                    <h3>Top Products</h3>
-                    <div class="product-list">
-                        {% for product in top_products %}
-                        <div class="product-item">
-                            <div class="product-info">
-                                <h4>{{ product.product_name }}</h4>
-                                <p>{{ product.total_sold }} units sold</p>
-                            </div>
-                            <div class="product-revenue">
-                                ₹{{ "{:,.2f}".format(product.total_revenue) }}
-                            </div>
+                    <h3>Quick Actions</h3>
+                    <div class="row">
+                        <div class="feature-card">
+                            <h3>Add New Sale</h3>
+                            <p>Record a new sales transaction</p>
+                            <a href="{{ url_for('sales') }}" class="btn btn-primary">Go to Sales</a>
                         </div>
-                        {% endfor %}
+                        <div class="feature-card">
+                            <h3>Check Inventory</h3>
+                            <p>View and manage your stock levels</p>
+                            <a href="{{ url_for('stock') }}" class="btn btn-primary">View Stock</a>
+                        </div>
+                        <div class="feature-card">
+                            <h3>Business Insights</h3>
+                            <p>Analyze your business performance</p>
+                            <a href="{{ url_for('insights') }}" class="btn btn-primary">View Insights</a>
+                        </div>
                     </div>
                 </div>
             </div>
         </main>
-    </div>
 
-    <!-- Demo Info Modal -->
-    <div id="demoInfoModal" class="demo-modal" style="display: none;">
-        <div class="demo-modal-content" style="max-width: 500px;">
-            <div class="demo-modal-header">
-                <h2>📊 Demo Environment Details</h2>
-                <span class="demo-close" onclick="closeDemoInfo()">&times;</span>
-            </div>
-            <div class="demo-modal-body">
-                <div class="demo-info">
-                    <p><strong>Current Demo Account:</strong></p>
-                    <div class="demo-credentials">
-                        <div class="credential-box">
-                            <p><strong>Email:</strong> <span class="credential-text">Recruiter@gmail.com</span></p>
-                            <p><strong>Password:</strong> <span class="credential-text">Recruit@100%</span></p>
-                        </div>
-                    </div>
-                    
-                    <div class="demo-features">
-                        <h3>📋 Sample Data Includes:</h3>
-                        <ul>
-                            <li>✅ {{ total_sales_count or 50 }}+ sales transactions</li>
-                            <li>✅ {{ total_purchases_count or 30 }}+ purchase orders</li>
-                            <li>✅ {{ stock_count or 25 }} inventory items</li>
-                            <li>✅ {{ customer_count or 15 }} customer records</li>
-                            <li>✅ Business analytics & insights</li>
-                            <li>✅ Forecasting algorithms</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="demo-note">
-                        <p><em>All data is pre-loaded for demonstration purposes. Feel free to explore all features!</em></p>
-                    </div>
-                </div>
-            </div>
-            <div class="demo-modal-footer">
-                <button class="demo-btn demo-btn-primary" onclick="closeDemoInfo()">
-                    Got it!
-                </button>
-            </div>
-        </div>
+        <footer>
+            <p>&copy; 2025 Forecast.vk. All rights reserved.</p>
+            <p>Made by K Varshit demo version for Forecast.vk (version 2.O)</p>
+        </footer>
     </div>
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
-    <script>
-        function showDemoInfo() {
-            document.getElementById('demoInfoModal').style.display = 'block';
-        }
-
-        function closeDemoInfo() {
-            document.getElementById('demoInfoModal').style.display = 'none';
-        }
-
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('demoInfoModal');
-            if (event.target === modal) {
-                closeDemoInfo();
-            }
-        }
-    </script>
 </body>
 </html>
