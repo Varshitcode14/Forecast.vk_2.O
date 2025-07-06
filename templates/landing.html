@@ -310,7 +310,7 @@
   <div class="demo-modal-content">
     <div class="demo-modal-header">
       <h2>🎯 Demo Access</h2>
-      <button class="demo-close">&times;</button>
+      <button class="demo-close" id="closeBtn">&times;</button>
     </div>
     <div class="demo-modal-body">
       <div class="demo-intro">
@@ -335,10 +335,10 @@
       </div>
     </div>
     <div class="demo-modal-footer">
-      <button class="demo-btn demo-btn-primary" onclick="window.location.href='/login'">
+      <button class="demo-btn demo-btn-primary" id="tryDemoBtn">
         Try Demo
       </button>
-      <button class="demo-btn demo-btn-secondary" onclick="closeDemoModal()">
+      <button class="demo-btn demo-btn-secondary" id="closeDemoBtn">
         Close
       </button>
     </div>
@@ -405,40 +405,92 @@
 </div>
 
 <script>
+console.log('Landing page script loaded');
+
 // Demo Modal Functions
 function showDemoModal() {
-  document.getElementById('demoModal').style.display = 'block';
+  console.log('Showing demo modal');
+  const modal = document.getElementById('demoModal');
+  if (modal) {
+    modal.style.display = 'block';
+    console.log('Modal display set to block');
+  } else {
+    console.error('Modal element not found');
+  }
 }
 
 function closeDemoModal() {
-  document.getElementById('demoModal').style.display = 'none';
-  localStorage.setItem('demoModalShown', 'true');
-}
-
-// Show modal on page load (only if not shown before in this session)
-document.addEventListener('DOMContentLoaded', function() {
-  if (!localStorage.getItem('demoModalShown')) {
-    setTimeout(showDemoModal, 1500); // Show after 1.5 seconds
-  }
-});
-
-// Close modal when clicking outside
-window.onclick = function(event) {
+  console.log('Closing demo modal');
   const modal = document.getElementById('demoModal');
-  if (event.target === modal) {
-    closeDemoModal();
+  if (modal) {
+    modal.style.display = 'none';
+    // Don't set localStorage so it shows every time for demo purposes
+    console.log('Modal closed');
   }
 }
 
-// Close modal with Escape key
-document.addEventListener('keydown', function(event) {
-  if (event.key === 'Escape') {
-    closeDemoModal();
+// Wait for DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOM loaded, setting up modal');
+  
+  // Show modal after 2 seconds
+  setTimeout(function() {
+    console.log('Timeout triggered, showing modal');
+    showDemoModal();
+  }, 2000);
+  
+  // Set up event listeners
+  const closeBtn = document.getElementById('closeBtn');
+  const closeDemoBtn = document.getElementById('closeDemoBtn');
+  const tryDemoBtn = document.getElementById('tryDemoBtn');
+  
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeDemoModal);
+    console.log('Close button listener added');
   }
+  
+  if (closeDemoBtn) {
+    closeDemoBtn.addEventListener('click', closeDemoModal);
+    console.log('Close demo button listener added');
+  }
+  
+  if (tryDemoBtn) {
+    tryDemoBtn.addEventListener('click', function() {
+      console.log('Try demo button clicked');
+      window.location.href = '/login';
+    });
+    console.log('Try demo button listener added');
+  }
+  
+  // Close modal when clicking outside
+  window.addEventListener('click', function(event) {
+    const modal = document.getElementById('demoModal');
+    if (event.target === modal) {
+      closeDemoModal();
+    }
+  });
+  
+  // Close modal with Escape key
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+      closeDemoModal();
+    }
+  });
+  
+  console.log('All event listeners set up');
 });
 
-// Close button functionality
-document.querySelector('.demo-close').onclick = closeDemoModal;
+// Also try to show modal when window loads (backup)
+window.addEventListener('load', function() {
+  console.log('Window loaded');
+  setTimeout(function() {
+    const modal = document.getElementById('demoModal');
+    if (modal && modal.style.display !== 'block') {
+      console.log('Backup modal show triggered');
+      showDemoModal();
+    }
+  }, 1000);
+});
 </script>
 </body>
 </html>
